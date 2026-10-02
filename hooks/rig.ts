@@ -14,7 +14,8 @@ const mixV = (a: Vec, b: Vec, t: number) => v(mix(a.x, b.x, t), mix(a.y, b.y, t)
 const len = (a: Vec) => Math.hypot(a.x, a.y)
 
 // The coats share every shape and differ only in these colors. `eyeOther` is
-// the eye on the viewer's right when the cat faces out, for odd eyes. Roles: `mask`
+// the eye on the viewer's right when the cat faces out, for odd eyes, and
+// `bridge` the front of the face in profile, for the tuxedo's blaze. Roles: `mask`
 // tints the face, `muzzle` is the nose and mouth area, `point` and `pointLight`
 // color the ears, lower legs, and tail, and `paw` and `farPaw` the feet.
 const SHARED = {
@@ -40,6 +41,7 @@ const SIAMESE = {
   farCoat: 0x6c5f56,
   farPoint: 0x382b24,
   mask: 0x6a564a,
+  bridge: 0x6a564a,
   maskDark: 0x4b3a31,
   muzzle: 0x4b3a31,
   paw: 0x4b3a31,
@@ -67,6 +69,7 @@ const ORANGE: typeof SIAMESE = {
   farCoat: 0xb7682a,
   farPoint: 0x93501c,
   mask: 0xf2a54a,
+  bridge: 0xf2a54a,
   maskDark: 0xd9862f,
   muzzle: 0xfde6c4,
   paw: 0xfde6c4,
@@ -94,6 +97,7 @@ const TUXEDO: typeof SIAMESE = {
   farCoat: 0x17171c,
   farPoint: 0x111115,
   mask: 0x23232b,
+  bridge: 0xf2f2f4,
   maskDark: 0xf2f2f4, // a white blaze down the nose bridge
   muzzle: 0xf2f2f4,
   paw: 0xf2f2f4,
@@ -121,6 +125,7 @@ const BLACK: typeof SIAMESE = {
   farCoat: 0x17171c,
   farPoint: 0x121216,
   mask: 0x2a2a33,
+  bridge: 0x2a2a33,
   maskDark: 0x35353f,
   muzzle: 0x363641,
   paw: 0x24242b,
@@ -147,6 +152,7 @@ const RUSSIAN_BLUE: typeof SIAMESE = {
   farCoat: 0x5e6775,
   farPoint: 0x525a67,
   mask: 0x8a94a3,
+  bridge: 0x8a94a3,
   maskDark: 0x7e8897,
   muzzle: 0x9ca5b3,
   paw: 0x7e8897,
@@ -173,6 +179,7 @@ const WHITE: typeof SIAMESE = {
   farCoat: 0xc2c2cb,
   farPoint: 0xb4b4bd,
   mask: 0xf2f2f5,
+  bridge: 0xf2f2f5,
   maskDark: 0xe8e8ee,
   muzzle: 0xffffff,
   paw: 0xe9e9ef,
@@ -517,6 +524,10 @@ const bodyPaint = (pose: Pose) => (shape: Shape, down: number, x: number, y: num
     case 'head': {
       // The mask darkens toward the face; the back of the head stays coat-colored.
       const toFace = x + 0.5 - pose.head.x
+      // The nose bridge in profile: the front of the face, from in front of the
+      // eye down to the nose.
+      const belowBrow = y + 0.5 - pose.head.y
+      if (toFace > 1.9 && belowBrow > -1.6 && belowBrow < 0.5) return COLORS.bridge
       if (toFace > 1.2) return COLORS.mask
       return down < -0.6 ? COLORS.coatLight : COLORS.coat
     }

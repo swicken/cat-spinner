@@ -6,7 +6,7 @@ There are six cats and four animations, and you can mix them freely.
 
 ## Cats
 
-![All six cats, walking and sitting](assets/coats.png)
+![All six cats, walking and sitting](assets/coats.png?v=1.5.2)
 
 From the top: **Siamese** (the default, a seal-point colorpoint), **Orange tabby**, **Tuxedo**, **Black**, **Russian Blue**, and **White**, which has odd eyes: one blue and one amber, which you see when it sits facing you.
 
