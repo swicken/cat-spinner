@@ -3,14 +3,16 @@
 // while Claude reads or searches, and jumping in surprise when a tool fails
 // or is denied.
 
-import { GROUND, SIT_X, set, standPose, type Canvas, type Pose, type Text } from './rig'
+import { blend, GROUND, SIT_X, set, standPose, type Canvas, type Pose, type Text } from './rig'
 
 export type Activity = 'type' | 'dig' | 'search'
-export type Act = { kind: Activity | 'startle'; frame: number }
+export type Act = { kind: Activity | 'startle' | 'stretch'; frame: number }
 
 // An activity lasts at least this long, so a quick read is still seen.
 export const ACT_FRAMES = 14
 export const STARTLE_FRAMES = 12
+// Waking from a nap: a long play-bow stretch, then on with the turn.
+export const STRETCH_FRAMES = 18
 
 // Which activity a tool shows, if any; other tools leave the cat be.
 export const activityOf = (tool: string): Activity | undefined => {
@@ -155,3 +157,26 @@ export const drawMagnifier = (canvas: Canvas, frame: number, paw: number, eye: n
   }
 }
 
+
+// Waking up: the front end reaches down and far forward, paws stretched out in
+// front, rear high and tail up; held a moment at full stretch, then back to
+// standing.
+export const stretchPose = (frame: number): Pose => {
+  const stand = standPose()
+  const base = stand.tail[0]
+  const front = stand.nearFront.at
+  const stretched: Pose = {
+    ...stand,
+    hip: { x: stand.hip.x, y: stand.hip.y - 1.2 },
+    shoulder: { x: stand.shoulder.x + 1.4, y: stand.shoulder.y + 3.6 },
+    head: { x: stand.head.x + 2.6, y: stand.head.y + 4.4 },
+    tail: [base, { x: base.x - 1.6, y: base.y - 2.4 }, { x: base.x - 2.2, y: base.y - 5.0 }, { x: base.x - 0.8, y: base.y - 6.6 }],
+    nearFront: { at: { x: front.x + 7.2, y: GROUND }, lift: 0 },
+    farFront: { at: { x: front.x + 8.4, y: GROUND }, lift: 0 },
+  }
+  // Into the stretch over the first third, held, then out over the last third.
+  const t = Math.min(frame, STRETCH_FRAMES) / STRETCH_FRAMES
+  const ease = (u: number) => u * u * (3 - 2 * u)
+  const amount = t < 1 / 3 ? ease(t * 3) : t > 2 / 3 ? ease((1 - t) * 3) : 1
+  return blend(stand, stretched, amount)
+}

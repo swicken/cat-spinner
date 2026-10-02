@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { advance, inAnimation, pickAnimation, position, sceneCells, SIT_FRAMES, trackOffset, trackWidth, type Cat, type Work } from '../hooks/register'
-import { ACT_FRAMES, activityOf, STARTLE_FRAMES } from '../hooks/react'
+import { advance, inAnimation, napCells, pickAnimation, position, sceneCells, SIT_FRAMES, trackOffset, trackWidth, type Cat, type Work } from '../hooks/register'
+import { ACT_FRAMES, activityOf, STARTLE_FRAMES, STRETCH_FRAMES } from '../hooks/react'
 import { COATS, CYCLE, pawAt, useCoat, W } from '../hooks/rig'
 import { BALL_R, startPlay } from '../hooks/yarn'
 import { isHalloweenOn, LANTERN_ARTS, lanternSpots } from '../hooks/season'
@@ -671,5 +671,84 @@ describe('Halloween', () => {
     const { text } = await $.command.run({ ...RUN, args: 'plain' })
     expect(writes).toEqual([{ key: 'cat-spinner.season', value: 'plain' }])
     expect(text).toBe('Switched the season to plain.')
+  })
+})
+
+describe('napping between turns', () => {
+  const BAND = {
+    plugin: 'cat-spinner',
+    surface: 'terminal',
+    component: 'AbovePrompt',
+    props: { hasSurvey: false, isWorking: false, maxRows: 20, bodyColumns: 100, scroll: { offset: 0, bodyRows: 20 }, view: {} },
+  } as const
+  const quietEngine: Parameters<typeof test>[1] = ($, on) => {
+    on('ui.render', ($, e) => {
+      const { Text } = $.ui.resolve(e)
+      return <Text>engine band</Text>
+    })
+  }
+
+  test('curls up in the band above the prompt between turns', { options: { season: 'plain' } }, async ($, on) => {
+    await quietEngine($, on)
+    const ui = await $.ui.mount(BAND)
+    const nap = await ui.find({ type: 'Raster', key: 'nap' })
+    expect(nap?.props.rows).toBe(6)
+    expect(colorsOf(nap?.props.cells).has(0x9c8e82)).toBe(true) // the Siamese coat
+    await ui.unmount()
+  })
+
+  test('leaves the band alone while Claude works, with Hide, or without room', async ($, on) => {
+    await quietEngine($, on)
+    for (const props of [{ ...BAND.props, isWorking: true }, { ...BAND.props, maxRows: 4 }, { ...BAND.props, hasSurvey: true }]) {
+      const ui = await $.ui.mount({ ...BAND, props })
+      expect(await ui.find({ type: 'Raster', key: 'nap' })).toBeUndefined()
+      await ui.unmount()
+    }
+  })
+
+  test('stays out of sight between turns with Hide', { options: { between: 'hide' } }, async ($, on) => {
+    await quietEngine($, on)
+    const ui = await $.ui.mount(BAND)
+    expect(await ui.find({ type: 'Raster', key: 'nap' })).toBeUndefined()
+    await ui.unmount()
+  })
+
+  // The nap's text cells, from the top two rows, as a string.
+  const zs = (frame: number) => {
+    const words = new Uint32Array(Uint8Array.from(atob(napCells({ run: 5, think: 0, sit: 0 }, 80, frame)), ch => ch.charCodeAt(0)).buffer)
+    return [...words].filter((w, i) => i % 3 === 0 && (w === 0x7a || w === 0x5a)).length
+  }
+
+  test('lets "z"s drift up, one, two, then three, and starts over', () => {
+    expect([0, 4, 8, 12, 16].map(zs)).toEqual([0, 1, 2, 3, 0])
+  })
+
+  test('naps where the walk stopped', () => {
+    const cellsAt = (run: number) => {
+      const words = new Uint32Array(Uint8Array.from(atob(napCells({ run, think: 0, sit: 0 }, 120, 0)), ch => ch.charCodeAt(0)).buffer)
+      const firstColumn = [...Array(120).keys()].find(col => [...Array(6).keys()].some(row => words[(row * 120 + col) * 3] !== 0x20))
+      return firstColumn
+    }
+    expect(cellsAt(30)! - cellsAt(0)!).toBe(30)
+  })
+})
+
+describe('waking up', () => {
+  const STRETCHING: Cat = { run: 5, think: 0, sit: 0, act: { kind: 'stretch', frame: 0 } }
+
+  test('stretches all the way through, even if Claude starts thinking at once', () => {
+    let cat = STRETCHING
+    for (let i = 0; i < STRETCH_FRAMES; i++) {
+      cat = advance(cat, true, W + 10)
+      expect(cat.act?.kind).toBe('stretch')
+      expect(cat.run).toBe(5)
+    }
+    cat = advance(cat, true, W + 10)
+    expect(cat.act).toBeUndefined()
+  })
+
+  test('gives way to a tool, or to a failure', () => {
+    expect(advance(STRETCHING, false, W + 10, Math.random, { doing: 'dig' }).act?.kind).toBe('dig')
+    expect(advance(STRETCHING, false, W + 10, Math.random, { isStartled: true }).act?.kind).toBe('startle')
   })
 })

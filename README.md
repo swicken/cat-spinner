@@ -15,7 +15,7 @@ There are eight cats and four animations, and you can mix them freely.
 | Running a command (Bash) | Crouches and digs, front paws scrabbling, dirt flying back past its hind legs and a little mound growing in front. |
 | Hitting a tool that fails or is denied | Jumps in surprise, back arched, tail puffed straight up, with a `!` over its head. |
 | Using any other tool | Keeps doing its animation. |
-| Done | Goes away with the spinner, and picks up where it left off next time. |
+| Done, waiting for you | Curls up asleep in the band above your prompt, right where it stopped, breathing slowly with "z"s drifting up. When you send your next message it wakes with a big stretch and carries on. |
 
 A failure interrupts anything, even sitting. Thinking comes before tool reactions. Each reaction lasts at least a second or so, so a quick read still shows.
 
@@ -46,6 +46,14 @@ These set what the cat does while Claude works without a tool running.
 ![The Siamese stalking and pouncing on a ball of yarn](assets/preview-pounce.gif?v=1.8.1)
 
 **Random:** a different one of walk, yarn, and pounce each time Claude starts working. The cat carries on from wherever it is.
+
+## Between turns
+
+When Claude finishes, the cat doesn't vanish: it curls up for a nap in a small band above your prompt, where it stopped and facing the way it was going, its back rising and falling and "z"s drifting up. Send a message and it wakes with a long play-bow stretch, then gets on with the turn. In the Halloween season it naps in its hat.
+
+![The orange cat asleep between turns, then waking with a stretch when a message is sent](assets/preview-nap.gif?v=1.10.0)
+
+The nap takes six rows above the prompt. If you'd rather keep that space, set **Between turns** to **Hide** (`/cat-spinner hide`), and the cat simply goes away until the next turn.
 
 ## Seasons
 
@@ -83,7 +91,7 @@ The install may say userConfig options are not yet set. Those are the settings b
 
 ## Choosing your cat and animation
 
-Run `/cat-spinner` to open its settings: a live preview of your cat above a list of settings, each showing its current choice: **Cat**, **Animation**, **Width**, **Alignment** (for a compact track), and **Season**. Move with the arrow keys and press Enter on a setting to see its options, then Enter again to pick one. Changes save as you pick them, and the preview updates to match. In a setting's options Esc goes back to the list; in the list, Esc or **Done** closes.
+Run `/cat-spinner` to open its settings: a live preview of your cat above a list of settings, each showing its current choice: **Cat**, **Animation**, **Width**, **Alignment** (for a compact track), **Season**, and **Between turns**. Move with the arrow keys and press Enter on a setting to see its options, then Enter again to pick one. Changes save as you pick them, and the preview updates to match. In a setting's options Esc goes back to the list; in the list, Esc or **Done** closes.
 
 There are shortcuts too, if you know what you want:
 
@@ -93,11 +101,12 @@ There are shortcuts too, if you know what you want:
 /cat-spinner compact     # or full
 /cat-spinner center      # or left, right
 /cat-spinner plain       # or auto, halloween
+/cat-spinner hide        # or nap
 ```
 
 **Width** sets how much of the terminal the cat walks across. **Full width**, the default, spans the whole window and follows it as you resize. **Compact** caps the track at 90 columns, for shorter walks. A compact track sits at the left by default, and **Alignment** moves it to the center or the right.
 
-The same choices are the **Cat**, **Animation**, **Width**, **Alignment**, and **Season** rows for cat-spinner in `/config`.
+The same choices are the **Cat**, **Animation**, **Width**, **Alignment**, **Season**, and **Between turns** rows for cat-spinner in `/config`.
 
 ## Update and uninstall
 
@@ -122,6 +131,7 @@ The mod hooks the spinner's drawing and puts a 9-row pixel grid, as wide as the 
 - **The walk** comes from a small skeleton rig (`hooks/rig.ts`). The legs move in a cat's walking order, so two or three paws are always on the ground. A planted paw stays on one spot of the ground while the body passes over it. The spine rocks slightly with each step, and the tail moves in a slow wave.
 - **The yarn play** (`hooks/yarn.ts`) is a small set of rules run each frame: the ball rolls with friction and bounces off the ends of the track; the cat faces the ball, walks up to it or backs away from it, waits for it to slow, then swats it in a seven-frame play-bow. The cat's gait advances one frame per pixel it moves, forward or back, so its paws stay planted while it walks. Yarn plays out the same way every time; pounce adds random swat strength and scoops, pauses to watch, and a stalk that ends in a six-frame leap.
 - **The reactions** (`hooks/react.ts`) come from a `tool.call` hook that notes which tool is running and whether it failed; each frame the cat starts, keeps, or drops an activity accordingly.
+- **The nap** (`hooks/nap.ts`) is hand-drawn like the sit, and lives in the band above the prompt, a separate place mods can draw. It has its own slow timer, a few frames a second, and draws only between turns; the band reports whether a turn is running.
 - **The seasonal extras** (`hooks/season.ts`) are drawn over the finished scene: the hat at the head's position in whichever pose, the pumpkin in the ball's place, and the bats wherever the cat isn't.
 - **The sit** is hand-drawn pixel art, because at this size a front-facing cat reads better drawn pixel by pixel. While seated, the cat blinks slowly, flicks its tail tip, and thinks `hmm`, `...`, `?`, and `!`.
 - **The colors** are a palette per coat (`COATS` in `hooks/rig.ts`): every shape uses a color role, such as coat, mask, muzzle, point, leg, or paw, so a new cat is a new palette. Patched coats also set two patch colors and a size, and their coat breaks into patches from smooth noise sampled in body coordinates. The Siamese is a seal-point colorpoint based on a real cat.

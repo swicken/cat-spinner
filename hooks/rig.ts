@@ -791,7 +791,8 @@ export const SIT_ART = [
   '.OOOOOOOOOOOOOOOOO.....',
 ]
 
-const sitColors = (): Record<string, number> => ({
+// The colors the hand-drawn art's letters stand for, in the current coat.
+export const artColors = (): Record<string, number> => ({
   O: COLORS.outline, C: COLORS.coat, c: COLORS.coatLight, d: COLORS.coatShade, Q: COLORS.cream,
   q: COLORS.creamShade, p: COLORS.pointLight, P: COLORS.point, F: COLORS.farPoint, E: COLORS.eye, e: COLORS.eyeOther,
   K: COLORS.pupil, N: COLORS.nose, I: COLORS.earInner, m: COLORS.mask, M: COLORS.maskDark,
@@ -813,7 +814,7 @@ export const drawSitCat = (think: number, thought: Thought, isAlert = false) => 
   const canvas: Canvas = { color: new Int32Array(W * H), owner: new Int8Array(W * H).fill(EMPTY) }
   const isClosed = !isAlert && think % 40 < 32
   const isFlicked = Math.floor(think / 6) % 4 === 3
-  const colors = sitColors()
+  const colors = artColors()
 
   SIT_ART.forEach((line, row) => {
     const shifted = isFlicked && SIT_TAIL_TIP.includes(row) ? line.slice(0, 18) + '.' + line.slice(18, -1) : line

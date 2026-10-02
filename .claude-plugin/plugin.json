@@ -1,6 +1,6 @@
 {
   "name": "cat-spinner",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "A pixel-art cat walks back and forth above the spinner, or plays with a ball of yarn, and sits down facing you to think while Claude thinks",
   "author": {
     "name": "Scott Wicken",
@@ -65,6 +65,16 @@
         "auto",
         "halloween",
         "plain"
+      ]
+    },
+    "between": {
+      "type": "string",
+      "title": "Between turns",
+      "description": "What the cat does between turns: nap above the prompt, or hide",
+      "default": "nap",
+      "options": [
+        "nap",
+        "hide"
       ]
     }
   }

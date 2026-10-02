@@ -8,6 +8,7 @@ A Claude Code mod (a plugin of function hooks) that draws a pixel-art cat above 
 - `hooks/rig.ts` is the cat itself: the coat palettes (`COATS`), the walking skeleton (`walkPose`, `standPose`, two-bone IK), the rasterizer with automatic outlines, and the hand-drawn seated cat (`SIT_ART`).
 - `hooks/yarn.ts` is the yarn and pounce play: ball physics, the chase rules, the swat, stalk, and leap poses, and drawing the ball.
 - `hooks/react.ts` is the reactions to Claude's tools: which tool means which activity (`activityOf`), the dig and startle poses, and the laptop, magnifying glass, and dirt drawn over the cat. The `tool.call` hook in `register.tsx` feeds it.
+- `hooks/nap.ts` is the cat asleep between turns: the hand-drawn curled-up loaf (same art letters as `SIT_ART`), its breathing, and the drifting "z"s. `napCells` in `register.tsx` draws it for the band above the prompt, and the wake-up stretch (`stretchPose`) lives in `react.ts`.
 - `hooks/season.ts` is the seasonal extras: the Season setting, when Halloween is on (`isHalloweenOn`, auto through October), the witch hat, the jack-o'-lantern, the bats, and the "boo" thought. Drawing takes a `Decor` explicitly; `PLAIN`, the default, draws the plain cat.
 - `tests/cat.test.tsx` holds the tests. `tests/scenes.ts` and `tests/golden.ts` are the golden scenes (below). `scripts/preview.ts` renders the README images in `assets/`.
 
@@ -38,6 +39,7 @@ The Season setting defaults to Auto, which depends on today's date. Any test tha
 
 ## Engine rules that bite
 
+- Each event may have only one hook without a matcher per module. A second `on('session.start', ...)` makes the whole module refuse to load, so new start-up work goes into the existing hook.
 - `$` may only be passed to functions declared at the top level of the file. The validator refuses anything else, so helpers that need `$` (like `startPreview`) live at the top level and take what they need as arguments.
 - Module-level variables reset whenever the module reloads, and changing a setting reloads it. Anything that must survive a setting change, like an open dialog, is rediscovered in `session.start` (for example through `$.ui.panes()`).
 - `Raster` exists only on the terminal surface. Every render hook checks `e.surface === 'terminal'` and otherwise leaves the engine's own drawing in place or draws plain text.

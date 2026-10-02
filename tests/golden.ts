@@ -15,4 +15,7 @@ export const GOLDEN: Record<string, string> = {
   'halloween: walk and sit': '2444bf90',
   'halloween: yarn': '173f487c',
   'halloween: reactions': '192677dd',
+  'nap: orange': '92059895',
+  'nap: calico facing left, halloween': '4bc8a8e5',
+  'wake-up stretch': '0c20c7d6',
 }

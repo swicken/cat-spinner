@@ -4,7 +4,8 @@
 // (assets/preview-yarn.gif, assets/preview-pounce.gif), each with a sit to
 // think and a stand, and the reactions to Claude's tools, each labeled with
 // what Claude is doing (assets/preview-reactions.gif), and the Halloween
-// extras (assets/preview-halloween.gif). Pounce uses a fixed seed, so its GIF
+// extras (assets/preview-halloween.gif), and the nap between turns with the
+// wake-up stretch (assets/preview-nap.gif). Pounce uses a fixed seed, so its GIF
 // is repeatable. Needs ffmpeg
 // on the PATH.
 //   npx tsx scripts/preview.ts
@@ -14,7 +15,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { crc32, deflateSync } from 'node:zlib'
 
-import { advance, COAT_LABELS, sceneCells, type Cat, type Work } from '../hooks/register.tsx'
+import { advance, COAT_LABELS, napCells, sceneCells, type Cat, type Work } from '../hooks/register.tsx'
 import { COATS, H, useCoat, type Coat } from '../hooks/rig.ts'
 import { startPlay } from '../hooks/yarn.ts'
 
@@ -244,5 +245,35 @@ gif('preview-pounce', scene({ run: 0, think: 0, sit: 0, play: startPlay(TRACK, 0
   const script = [...Array(150).fill(false), ...Array(60).fill(true), ...Array(20).fill(false)] as boolean[]
   const frames = script.map((isThinking, time) => toImage(sceneCells((cat = advance(cat, isThinking, TRACK, rng)), TRACK, { isHalloween: true, time })))
   gif('preview-halloween', frames)
+  useCoat('siamese')
+}
+
+// Between turns: the cat curled up asleep, then, when a message is sent,
+// waking with a stretch and walking off. The nap redraws a few times a second,
+// so each of its frames is held for three GIF frames.
+{
+  useCoat('orange')
+  const napRows = 6
+  const label = (img: Uint8Array, text: string) => {
+    const out = new Uint8Array(width * (LABEL_HEIGHT + height) * 3)
+    drawLabel(out, 0, text)
+    out.set(img, width * LABEL_HEIGHT * 3)
+    return out
+  }
+  // The nap's six rows at the bottom of the spinner's nine.
+  const padded = (cells: string) => {
+    const nap = new Uint32Array(Uint8Array.from(atob(cells), c => c.charCodeAt(0)).buffer)
+    const all = new Uint32Array(TRACK * ROWS * 3)
+    for (let i = 0; i < all.length; i += 3) all.set([0x20, 0x01000000, 0x01000000], i)
+    all.set(nap, TRACK * (ROWS - napRows) * 3)
+    let binary = ''
+    for (const byte of new Uint8Array(all.buffer)) binary += String.fromCharCode(byte)
+    return btoa(binary)
+  }
+  const resting: Cat = { run: 6, think: 0, sit: 0 }
+  const napping = Array.from({ length: 36 }, (_, frame) => label(toImage(padded(napCells(resting, TRACK, frame))), 'Between turns')).flatMap(img => [img, img, img])
+  let cat: Cat = { ...resting, act: { kind: 'stretch', frame: 0 } }
+  const waking = Array.from({ length: 60 }, () => label(toImage(sceneCells((cat = advance(cat, false, TRACK)), TRACK)), 'You send a message'))
+  gif('preview-nap', [...napping, ...waking], LABEL_HEIGHT + height)
   useCoat('siamese')
 }

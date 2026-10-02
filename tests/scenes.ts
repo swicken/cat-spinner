@@ -3,7 +3,7 @@
 // whose pixels change fails the test until golden.ts is regenerated on purpose
 // (npx tsx scripts/fingerprints.ts > tests/golden.ts).
 
-import { advance, sceneCells, type Cat, type Work } from '../hooks/register'
+import { advance, napCells, sceneCells, type Cat, type Work } from '../hooks/register'
 import { COATS, useCoat, W, type Coat } from '../hooks/rig'
 import { startPlay } from '../hooks/yarn'
 
@@ -56,6 +56,21 @@ export const SCENES: Record<string, () => string[]> = {
   'halloween: walk and sit': () => walkAndSit('black', true),
   'halloween: yarn': () => play(false, 240, true),
   'halloween: reactions': () => reactions(true),
+  'nap: orange': () => nap('orange', false),
+  'nap: calico facing left, halloween': () => nap('calico', true, 70),
+  'wake-up stretch': () => {
+    const track = W + 30
+    let cat: Cat = { run: 5, think: 0, sit: 0, act: { kind: 'stretch', frame: 0 } }
+    return Array.from({ length: 30 }, (_, i) => sceneCells((cat = advance(cat, i < 4, track)), track))
+  },
+}
+
+// Two full breaths and a cycle of "z"s, curled up where a walk at `run` ended.
+function nap(coat: Coat, isHalloween: boolean, run = 5) {
+  useCoat(coat)
+  const frames = Array.from({ length: 32 }, (_, frame) => napCells({ run, think: 0, sit: 0 }, W + 30, frame, { isHalloween, time: frame }))
+  useCoat('siamese')
+  return frames
 }
 
 // FNV-1a over every frame's cells: a short, stable fingerprint of the pixels.

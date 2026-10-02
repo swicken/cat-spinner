@@ -1,9 +1,10 @@
 import type { EngineInterface, Register } from 'claude-code'
 
 import { blend, COATS, COLORS, drawCat, drawSitCat, H, standPose, useCoat, walkPose, W, type Coat, type Text, type Thought } from './rig'
+import { drawNap, NAP_ROWS } from './nap'
 import {
   ACT_FRAMES, activityOf, digPose, drawDirt, drawLaptop, drawMagnifier, isSeated, STARTLE_FRAMES, startlePose,
-  startleText, type Act, type Activity,
+  startleText, STRETCH_FRAMES, stretchPose, type Act, type Activity,
 } from './react'
 import {
   drawBats, drawFrontHat, drawLanterns, drawPumpkin, drawSideHat, drawSitHat, HALLOWEEN_THOUGHTS, isHalloweenOn, PLAIN, SEASONS,
@@ -13,6 +14,9 @@ import { drawBall, playPose, rollBall, startPlay, stepPlay, type Play, type Rng 
 
 const FRAME_MS = 90
 const KEY = 'cat'
+const NAP_KEY = 'nap'
+// The nap needs only a few frames a second: a slow breath and drifting "z"s.
+const NAP_MS = 250
 const ROWS = H / 2
 const DEFAULT_COLOR = 0x01000000
 const UPPER_HALF = 0x2580
@@ -29,6 +33,8 @@ export const WIDTHS = ['full', 'compact'] as const
 export type Width = (typeof WIDTHS)[number]
 export const ALIGNS = ['left', 'center', 'right'] as const
 export type Align = (typeof ALIGNS)[number]
+export const BETWEENS = ['nap', 'hide'] as const
+export type Between = (typeof BETWEENS)[number]
 
 // The most a Raster takes, and the compact track's cap.
 const MAX_TRACK = 512
@@ -75,6 +81,7 @@ export type Work = { doing?: Activity; isStartled?: boolean }
 const nextAct = (act: Act | undefined, work: Work): Act | undefined => {
   if (work.isStartled) return { kind: 'startle', frame: 0 }
   if (act?.kind === 'startle') return act.frame < STARTLE_FRAMES ? { ...act, frame: act.frame + 1 } : undefined
+  if (act?.kind === 'stretch' && !work.doing) return act.frame < STRETCH_FRAMES ? { ...act, frame: act.frame + 1 } : undefined
   if (work.doing && work.doing !== act?.kind) return { kind: work.doing, frame: 0 }
   if (!act) return undefined
   return work.doing || act.frame < ACT_FRAMES ? { ...act, frame: act.frame + 1 } : undefined
@@ -83,10 +90,11 @@ const nextAct = (act: Act | undefined, work: Work): Act | undefined => {
 // What the cat does next frame: walk or play, or sit down and think while
 // Claude thinks. A rolling ball keeps rolling while the cat sits.
 export const advance = (cat: Cat, isThinking: boolean, track = W, rng: Rng = Math.random, work: Work = {}): Cat => {
-  const act = isThinking ? undefined : nextAct(cat.act, work)
-  // A startled cat is on its feet at once; one busy with a tool stays put.
+  // Thinking sets aside any activity, except a wake-up stretch, which finishes.
+  const act = isThinking && cat.act?.kind !== 'stretch' ? undefined : nextAct(cat.act, work)
+  // A startled or stretching cat is on its feet at once; one busy with a tool stays put.
   const still = cat.play && { ...rollBall(cat.play, track), swat: 0, watch: 0, stalk: 0, leap: 0 }
-  if (act?.kind === 'startle') return { ...cat, act, play: still, sit: 0, think: 0 }
+  if (act?.kind === 'startle' || act?.kind === 'stretch') return { ...cat, act, play: still, sit: 0, think: 0 }
   if (isThinking || isSeated(act)) {
     return cat.sit < SIT_FRAMES ? { ...cat, act, play: still, sit: cat.sit + 1 } : { ...cat, act, play: still, think: cat.think + 1 }
   }
@@ -143,6 +151,7 @@ export const sceneCells = (cat: Cat, track: number, decor: Decor = PLAIN) => {
   const act = cat.act
   const pose =
     act?.kind === 'startle' ? startlePose(act.frame)
+      : act?.kind === 'stretch' ? stretchPose(act.frame)
       : act?.kind === 'dig' && cat.sit === 0 ? digPose(act.frame)
         : cat.play ? playPose(cat.play, moving) : moving
   const standing = blend(pose, standPose(), smooth(cat.sit / SETTLE_FRAMES))
@@ -152,7 +161,7 @@ export const sceneCells = (cat: Cat, track: number, decor: Decor = PLAIN) => {
       ? drawCat(standing, isLookingOut)
       : drawSitCat(cat.think, isSeated(act) ? undefined : thoughtOf(cat, decor), isSeated(act))
   const { canvas } = drawn
-  const texts = act?.kind === 'startle' ? [...drawn.texts, startleText(pose)] : drawn.texts
+  const texts: Text[] = act?.kind === 'startle' ? [...drawn.texts, startleText(pose)] : drawn.texts
   // The witch hat, on whichever way the head faces; the tools' props go over
   // it, since the cat holds them up in front.
   if (decor.isHalloween) {
@@ -192,10 +201,24 @@ export const sceneCells = (cat: Cat, track: number, decor: Decor = PLAIN) => {
     drawLanterns(paint, isFree, track, decor.time, H - 2, decor.seed ?? 0)
   }
 
-  const words = new Uint32Array(track * ROWS * 3)
+  return encodeCells(pixels, filled, track, ROWS, texts, x, isFacingRight)
+}
+
+// A track's pixels as Raster cells, `rows` cells tall, with the sprite's text
+// (thought bubbles, a "!", "z"s) at the sprite's spot, mirrored with it.
+const encodeCells = (
+  pixels: Int32Array,
+  filled: Uint8Array,
+  track: number,
+  rows: number,
+  texts: Text[],
+  x: number,
+  isFacingRight: boolean,
+) => {
+  const words = new Uint32Array(track * rows * 3)
   for (let i = 0; i < words.length; i += 3) words.set([0x20, DEFAULT_COLOR, DEFAULT_COLOR], i)
   const pixel = (px: number, py: number) => (filled[py * track + px] ? pixels[py * track + px] : undefined)
-  for (let row = 0; row < ROWS; row++) {
+  for (let row = 0; row < rows; row++) {
     for (let col = 0; col < track; col++) {
       const top = pixel(col, row * 2)
       const bottom = pixel(col, row * 2 + 1)
@@ -205,10 +228,11 @@ export const sceneCells = (cat: Cat, track: number, decor: Decor = PLAIN) => {
       else words.set([UPPER_HALF, top, bottom ?? DEFAULT_COLOR], at)
     }
   }
-  for (const [col, row, text, fg, bg] of texts as Text[]) {
+  for (const [col, row, text, fg, bg] of texts) {
     const start = isFacingRight ? col : W - col - text.length
     ;[...text].forEach((ch, i) => {
-      words.set([ch.codePointAt(0) ?? 0x20, fg, bg], (row * track + x + start + i) * 3)
+      const at = (row * track + x + start + i) * 3
+      if (x + start + i >= 0 && x + start + i < track) words.set([ch.codePointAt(0) ?? 0x20, fg, bg], at)
     })
   }
 
@@ -217,6 +241,25 @@ export const sceneCells = (cat: Cat, track: number, decor: Decor = PLAIN) => {
   for (const byte of bytes) binary += String.fromCharCode(byte)
 
   return btoa(binary)
+}
+
+// The napping cat as Raster cells, NAP_ROWS tall, curled up where it stopped
+// and facing the way it was going.
+export const napCells = (cat: Cat, track: number, frame: number, decor: Decor = PLAIN) => {
+  const { x, isFacingRight } = cat.play ?? position(cat.run, track)
+  const { canvas, texts } = drawNap(frame, decor.isHalloween)
+  const height = NAP_ROWS * 2
+  const pixels = new Int32Array(track * height)
+  const filled = new Uint8Array(track * height)
+  for (let py = 0; py < height; py++) {
+    for (let px = 0; px < W; px++) {
+      const i = py * W + (isFacingRight ? px : W - 1 - px)
+      if ((canvas.owner[i] ?? -1) === -1 || x + px >= track) continue
+      pixels[py * track + x + px] = canvas.color[i] ?? 0
+      filled[py * track + x + px] = 1
+    }
+  }
+  return encodeCells(pixels, filled, track, NAP_ROWS, texts, x, isFacingRight)
 }
 
 // The settings dialog /cat-spinner opens, and what its pickers show.
@@ -244,6 +287,10 @@ const WIDTH_LABELS: Record<Width, string> = {
   compact: 'Compact: up to 90 columns',
 }
 const ALIGN_LABELS: Record<Align, string> = { left: 'Left', center: 'Center', right: 'Right' }
+const BETWEEN_LABELS: Record<Between, string> = {
+  nap: 'Nap: curls up asleep above the prompt',
+  hide: 'Hide: nothing between turns',
+}
 const SEASON_LABELS: Record<Season, string> = {
   auto: 'Auto: Halloween through October',
   halloween: 'Halloween',
@@ -274,7 +321,7 @@ function startPreview($: EngineInterface, animation: Animation, playing: Playabl
 
 // Which setting the dialog is showing the options of, or none for the list of
 // settings. A pick reloads the module, which puts the dialog back on the list.
-let editing: 'coat' | 'animation' | 'width' | 'align' | 'season' | undefined
+let editing: 'coat' | 'animation' | 'width' | 'align' | 'season' | 'between' | undefined
 
 function stopPreview() {
   preview?.timer.cancel()
@@ -287,6 +334,7 @@ const isAnimation = (name: string): name is Animation => (ANIMATIONS as readonly
 const isWidth = (name: string): name is Width => (WIDTHS as readonly string[]).includes(name)
 const isAlign = (name: string): name is Align => (ALIGNS as readonly string[]).includes(name)
 const isSeason = (name: string): name is Season => (SEASONS as readonly string[]).includes(name)
+const isBetween = (name: string): name is Between => (BETWEENS as readonly string[]).includes(name)
 
 export const register: Register = (on, options) => {
   const coatOption = String(options.coat ?? 'siamese')
@@ -300,6 +348,8 @@ export const register: Register = (on, options) => {
   const seasonOption = String(options.season ?? 'auto')
   const season: Season = isSeason(seasonOption) ? seasonOption : 'auto'
   isHalloween = isHalloweenOn(season, new Date())
+  const betweenOption = String(options.between ?? 'nap')
+  const between: Between = isBetween(betweenOption) ? betweenOption : 'nap'
   useCoat(coat)
   let playing: Playable = animation === 'random' ? pickAnimation(undefined) : animation
 
@@ -309,6 +359,14 @@ export const register: Register = (on, options) => {
       description: 'Pick your cat and its animation (or /cat-spinner orange, /cat-spinner pounce, ...)',
     })
     if ((await $.ui.panes()).some(pane => pane.id === SETTINGS)) startPreview($, animation, playing)
+    // The nap's own slow timer runs all session and draws only between turns.
+    if (between === 'nap') {
+      $.clock.every(NAP_MS, () => {
+        napFrame += 1
+        if (isWorking || !napRequest || !napTrack) return
+        void $.ui.blit({ requestId: napRequest, key: NAP_KEY, columns: napTrack, rows: NAP_ROWS, cells: napCells(cat, napTrack, napFrame, decor()) })
+      })
+    }
 
     return next(e)
   })
@@ -346,6 +404,7 @@ export const register: Register = (on, options) => {
       { key: 'width', label: 'Width', current: width as string, names: WIDTHS as readonly string[], labels: WIDTH_LABELS as Record<string, string> },
       { key: 'align', label: 'Alignment', current: align as string, names: ALIGNS as readonly string[], labels: ALIGN_LABELS as Record<string, string> },
       { key: 'season', label: 'Season', current: season as string, names: SEASONS as readonly string[], labels: SEASON_LABELS as Record<string, string> },
+      { key: 'between', label: 'Between turns', current: between as string, names: BETWEENS as readonly string[], labels: BETWEEN_LABELS as Record<string, string> },
     ] as const
     // Alignment only matters for a compact track, which is narrower than the terminal.
     const settings = every.filter(setting => setting.key !== 'align' || width === 'compact')
@@ -397,12 +456,12 @@ export const register: Register = (on, options) => {
   })
 
   // Switching writes the plugin's own "Cat", "Animation", "Width",
-  // "Alignment", or "Season" setting, the same ones /config shows, so the
-  // module reloads with the new choice.
+  // "Alignment", "Season", or "Between turns" setting, the same ones /config
+  // shows, so the module reloads with the new choice.
   on('command.run', { command: 'cat-spinner' }, async ($, e) => {
     const choice = e.args.trim().toLowerCase()
     const list = (names: readonly string[]) => names.map(name => `/cat-spinner ${name}`).join(' or ')
-    const usage = `Switch cats with ${list(COAT_NAMES)}, animations with ${list(ANIMATIONS)}, the width with ${list(WIDTHS)}, a compact track's alignment with ${list(ALIGNS)}, and the season with ${list(SEASONS)}.`
+    const usage = `Switch cats with ${list(COAT_NAMES)}, animations with ${list(ANIMATIONS)}, the width with ${list(WIDTHS)}, a compact track's alignment with ${list(ALIGNS)}, the season with ${list(SEASONS)}, and what it does between turns with ${list(BETWEENS)}.`
     const where = width === 'compact' ? `compact width, ${align}-aligned` : 'full width'
     const festive = season === 'auto' ? (isHalloween ? ', dressed for Halloween (auto)' : '') : season === 'halloween' ? ', dressed for Halloween' : ''
     const now = `${animation === 'random' ? `random (${playing} right now)` : animation}, at ${where}${festive}`
@@ -441,6 +500,11 @@ export const register: Register = (on, options) => {
       return { text: width === 'compact' ? `Aligned ${choice}.` : `Aligned ${choice}; it shows once the width is compact (/cat-spinner compact).` }
     }
 
+    if (isBetween(choice)) {
+      if (choice === between) return { text: `Between turns, the cat already does: ${between}.` }
+      const { deny } = await $.config.set({ key: 'cat-spinner.between', value: choice })
+      return { text: deny ? `Couldn't switch that: ${deny}` : choice === 'nap' ? 'Between turns, the cat naps.' : 'Between turns, the cat stays out of sight.' }
+    }
     if (isSeason(choice)) {
       if (choice === season) return { text: `The season is already ${season}.` }
       const { deny } = await $.config.set({ key: 'cat-spinner.season', value: choice })
@@ -469,15 +533,25 @@ export const register: Register = (on, options) => {
   let cat: Cat = { run: 0, think: 0, sit: 0 }
   let requestId = ''
   let track = 0
+  // Between turns the cat naps in the band above the prompt.
+  let isWorking = false
+  let napRequest = ''
+  let napTrack = 0
+  let napFrame = 0
+  const decor = () => ({ isHalloween, time: frame, seed: sceneSeed })
 
   on('prompt.submit', ($, e, next) => {
     if (animation === 'random') playing = pickAnimation(playing)
+    // Waking from a nap: the turn starts with a stretch, and the band clears.
+    if (between === 'nap') cat = { ...cat, act: { kind: 'stretch', frame: 0 } }
+    isWorking = true
+    $.ui.invalidate('ui.render')
     timer ??= $.clock.every(FRAME_MS, () => {
       if (!requestId || !track) return
       cat = advance(inAnimation(cat, playing, track), isThinking, track, Math.random, { doing, isStartled })
       isStartled = false
       frame += 1
-      void $.ui.blit({ requestId, key: KEY, columns: track, rows: ROWS, cells: sceneCells(cat, track, { isHalloween, time: frame, seed: sceneSeed }) })
+      void $.ui.blit({ requestId, key: KEY, columns: track, rows: ROWS, cells: sceneCells(cat, track, decor()) })
     })
 
     return next(e)
@@ -486,8 +560,27 @@ export const register: Register = (on, options) => {
   on('turn.complete', ($, e, next) => {
     timer?.cancel()
     timer = undefined
+    isWorking = false
+    $.ui.invalidate('ui.render')
 
     return next(e)
+  })
+
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    // The band is the cat's only between turns, when there's room, and it yields
+    // to a survey.
+    const isIdle = !e.props.isWorking && !isWorking
+    if (between !== 'nap' || !isIdle || e.surface !== 'terminal' || e.props.hasSurvey || e.props.maxRows < NAP_ROWS) return next(e)
+    napRequest = e.requestId
+    const columns = e.props.bodyColumns
+    napTrack = trackWidth(columns, width)
+    const { Box, Raster } = $.ui.resolve(e)
+
+    return (
+      <Box key="nap-track" marginLeft={trackOffset(columns, napTrack, align)}>
+        <Raster key={NAP_KEY} columns={napTrack} rows={NAP_ROWS} cells={napCells(cat, napTrack, napFrame, decor())} />
+      </Box>
+    )
   })
 
   on('ui.render', { component: 'Spinner' }, async ($, e, next) => {
@@ -502,7 +595,7 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="column">
         <Box key="track" marginLeft={trackOffset(e.viewport?.columns ?? 80, track, align)}>
-          <Raster key={KEY} columns={track} rows={ROWS} cells={sceneCells(cat, track, { isHalloween, time: frame, seed: sceneSeed })} />
+          <Raster key={KEY} columns={track} rows={ROWS} cells={sceneCells(cat, track, decor())} />
         </Box>
         {await next(e)}
       </Box>
