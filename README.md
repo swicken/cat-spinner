@@ -28,6 +28,17 @@ Here's the Siamese walking, sitting down to think, and walking on:
 
 **Random:** a different one of walk, yarn, and pounce each time Claude starts working. The cat carries on from wherever it is.
 
+## Reactions
+
+Whatever the animation, the cat reacts to what Claude is doing with its tools:
+
+- **Editing or writing files:** it sits facing you, typing on a little laptop.
+- **Running a command:** it digs, front paws scrabbling, dirt flying back past its hind legs.
+- **Reading or searching:** it sits and sweeps a magnifying glass across its face, its eye big under the lens.
+- **A tool fails or is denied:** it jumps in surprise, back arched, tail puffed straight up, with a `!` over its head.
+
+Each reaction lasts at least a second or so, so quick reads still show. Other tools leave the animation running.
+
 > **Still in progress.** This is an early version and changes are still coming, so expect the cat to keep evolving.
 
 ## Requirements
@@ -91,6 +102,7 @@ The mod hooks the spinner's drawing and puts a 9-row pixel grid above the normal
 
 - **The walk** comes from a small skeleton rig (`hooks/rig.ts`). The legs move in a cat's walking order, so two or three paws are always on the ground. A planted paw stays on one spot of the ground while the body passes over it. The spine rocks slightly with each step, and the tail moves in a slow wave.
 - **The yarn play** (`hooks/yarn.ts`) is a small set of rules run each frame: the ball rolls with friction and bounces off the ends of the track; the cat faces the ball, walks up to it or backs away from it, waits for it to slow, then swats it in a seven-frame play-bow. The cat's gait advances one frame per pixel it moves, forward or back, so its paws stay planted while it walks. Yarn plays out the same way every time; pounce adds random swat strength and scoops, pauses to watch, and a stalk that ends in a six-frame leap.
+- **The reactions** (`hooks/react.ts`) come from a `tool.call` hook that notes which tool is running and whether it failed; each frame the cat starts, keeps, or drops an activity accordingly.
 - **The sit** is hand-drawn pixel art, because at this size a front-facing cat reads better drawn pixel by pixel. While seated, the cat blinks slowly, flicks its tail tip, and thinks `hmm`, `...`, `?`, and `!`.
 - **The colors** are a palette per coat (`COATS` in `hooks/rig.ts`): every shape uses a color role, such as coat, mask, muzzle, point, leg, or paw, so a new cat is a new palette. Patched coats also set two patch colors and a size, and their coat breaks into patches from smooth noise sampled in body coordinates. The Siamese is a seal-point colorpoint based on a real cat.
 
@@ -100,9 +112,10 @@ The plugin is the repository root: `.claude-plugin/plugin.json`, the hooks modul
 
 ```sh
 claude plugin validate .        # check the manifest and hooks the way Claude Code loads them
-claude plugin test .            # run the tests
+claude plugin test .            # run the tests, including the golden scenes
 claude --plugin-dir .           # try your local copy in a session
 npx tsx scripts/preview.ts      # regenerate the GIFs in assets/ (needs ffmpeg)
+npx tsx scripts/fingerprints.ts > tests/golden.ts   # after an intended visual change
 ```
 
 ## License

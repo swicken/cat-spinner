@@ -334,6 +334,9 @@ export type Pose = {
   farHind: Paw
   farFront: Paw
   eyesClosed: boolean
+  // A startled cat: how high the back arches, and how puffed up the tail is.
+  arch?: number
+  puff?: number
 }
 
 export const blend = (a: Pose, b: Pose, t: number): Pose => {
@@ -349,6 +352,8 @@ export const blend = (a: Pose, b: Pose, t: number): Pose => {
     farHind: paw(a.farHind, b.farHind),
     farFront: paw(a.farFront, b.farFront),
     eyesClosed: t < 0.5 ? a.eyesClosed : b.eyesClosed,
+    arch: mix(a.arch ?? 0, b.arch ?? 0, t),
+    puff: mix(a.puff ?? 0, b.puff ?? 0, t),
   }
 }
 
@@ -521,8 +526,8 @@ const bodyShapes = (pose: Pose): Shape[] => {
   const spine = Array.from({ length: 26 }, (_, i) => {
     const t = i / 25
     const drop = 0.5 * Math.exp(-(((t - 0.8) / 0.15) ** 2))
-    const at = add(mixV(hip, shoulder, t), v(0, -0.35 * Math.sin(Math.PI * t) + drop))
-    return circle(at, radiusAt(t), t, 'body')
+    const at = add(mixV(hip, shoulder, t), v(0, -(0.35 + (pose.arch ?? 0)) * Math.sin(Math.PI * t) + drop))
+    return circle(at, radiusAt(t) * (1 + 0.06 * (pose.puff ?? 0)), t, 'body')
   })
   const h = head
 
@@ -542,7 +547,7 @@ const bodyShapes = (pose: Pose): Shape[] => {
 const tailShapes = (pose: Pose): Blob[] =>
   Array.from({ length: 40 }, (_, i) => {
     const t = i / 39
-    return circle(bezier(pose.tail, t), mix(1.2, 0.95, t), t, 'tail')
+    return circle(bezier(pose.tail, t), mix(1.2, 0.95, t) * (1 + 0.3 * (pose.puff ?? 0)), t, 'tail')
   })
 
 const inTri = ({ a, b, c }: Tri, x: number, y: number) => {
@@ -616,7 +621,7 @@ const drawLayer = (canvas: Canvas, layer: Layer, id: number) => {
   }
 }
 
-const set = (canvas: Canvas, x: number, y: number, color: number) => {
+export const set = (canvas: Canvas, x: number, y: number, color: number) => {
   const px = Math.floor(x), py = Math.floor(y)
   if (px < 0 || px >= W || py < 0 || py >= H) return
   canvas.color[py * W + px] = color
@@ -787,7 +792,7 @@ const sitColors = (): Record<string, number> => ({
 const SIT_EYE_ROW = 4
 const SIT_TAIL_TIP = [10, 11]
 // The sprite column where the seated art starts, so the cat sits where it stood.
-const SIT_X = 8
+export const SIT_X = 8
 // Where in the patch pattern the seated cat's coat comes from.
 const SIT_PATCHES = 40
 
@@ -795,9 +800,10 @@ export type Thought = { puffs: number; text: string } | undefined
 export type Text = [number, number, string, number, number]
 
 // `think` counts frames seated: it drives the slow blink and the tail flick.
-export const drawSitCat = (think: number, thought: Thought) => {
+// `isAlert` keeps the eyes open (busy with something, not thinking).
+export const drawSitCat = (think: number, thought: Thought, isAlert = false) => {
   const canvas: Canvas = { color: new Int32Array(W * H), owner: new Int8Array(W * H).fill(EMPTY) }
-  const isClosed = think % 40 < 32
+  const isClosed = !isAlert && think % 40 < 32
   const isFlicked = Math.floor(think / 6) % 4 === 3
   const colors = sitColors()
 

@@ -1,8 +1,11 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { advance, inAnimation, pickAnimation, position, sceneCells, SIT_FRAMES, type Cat } from '../hooks/register'
+import { advance, inAnimation, pickAnimation, position, sceneCells, SIT_FRAMES, type Cat, type Work } from '../hooks/register'
+import { ACT_FRAMES, activityOf, STARTLE_FRAMES } from '../hooks/react'
 import { COATS, CYCLE, pawAt, useCoat, W } from '../hooks/rig'
 import { BALL_R, startPlay } from '../hooks/yarn'
+import { GOLDEN } from './golden'
+import { fingerprint, SCENES } from './scenes'
 
 const TRACK = W + 10 // a 10-cell span to walk across
 const WALKING: Cat = { run: 0, think: 0, sit: 0 }
@@ -427,5 +430,70 @@ describe('the settings dialog', () => {
     await ui.press({ key: 'animation-pounce' })
     expect(writes).toEqual([{ key: 'cat-spinner.animation', value: 'pounce' }])
     await ui.unmount()
+  })
+})
+
+describe('golden scenes', () => {
+  for (const [name, scene] of Object.entries(SCENES)) {
+    test(`draws "${name}" exactly as before`, () => {
+      expect(fingerprint(scene())).toBe(GOLDEN[name])
+    })
+  }
+
+  test('covers every scene it has a fingerprint for', () => {
+    expect(Object.keys(GOLDEN).sort()).toEqual(Object.keys(SCENES).sort())
+  })
+})
+
+describe("reacting to Claude's tools", () => {
+  const frames = (start: Cat, count: number, work: Work, isThinking = false) => {
+    let cat = start
+    const all: Cat[] = []
+    for (let i = 0; i < count; i++) all.push((cat = advance(cat, isThinking, W + 10, Math.random, work)))
+    return all
+  }
+  const WALKING: Cat = { run: 7, think: 0, sit: 0 }
+
+  test('picks an activity for the tools it knows, and none for the rest', () => {
+    expect(activityOf('Edit')).toBe('type')
+    expect(activityOf('Write')).toBe('type')
+    expect(activityOf('Bash')).toBe('dig')
+    expect(activityOf('Read')).toBe('search')
+    expect(activityOf('Grep')).toBe('search')
+    expect(activityOf('Agent')).toBeUndefined()
+    expect(activityOf('mcp__slack__send')).toBeUndefined()
+  })
+
+  test('sits down to type without walking, and stays put', () => {
+    const typing = frames(WALKING, 20, { doing: 'type' })
+    expect(typing.every(cat => cat.run === WALKING.run)).toBe(true)
+    expect(typing.at(-1)).toMatchObject({ sit: SIT_FRAMES, act: { kind: 'type' } })
+  })
+
+  test('keeps an activity going a little after a quick tool, then walks on', () => {
+    const quick = frames(WALKING, 1, { doing: 'search' })
+    const after = frames(quick.at(-1)!, ACT_FRAMES + SIT_FRAMES + 2, {})
+    expect(after[ACT_FRAMES - 2]!.act?.kind).toBe('search')
+    expect(after.at(-1)!.act).toBeUndefined()
+    expect(after.at(-1)!.sit).toBe(0)
+  })
+
+  test('digs standing up, without moving along the track', () => {
+    const digging = frames(WALKING, 12, { doing: 'dig' })
+    expect(digging.every(cat => cat.sit === 0 && cat.run === WALKING.run && cat.act?.kind === 'dig')).toBe(true)
+  })
+
+  test('jumps up at once when a tool fails, even mid-sit, then carries on', () => {
+    const seated = frames(WALKING, 10, { doing: 'type' }).at(-1)!
+    const [startled] = frames(seated, 1, { isStartled: true })
+    expect(startled).toMatchObject({ sit: 0, act: { kind: 'startle', frame: 0 } })
+    const after = frames(startled!, STARTLE_FRAMES + 1, {})
+    expect(after.at(-1)!.act).toBeUndefined()
+  })
+
+  test('drops any activity to sit and think when Claude thinks', () => {
+    const digging = frames(WALKING, 3, { doing: 'dig' }).at(-1)!
+    const [thinking] = frames(digging, 1, { doing: 'dig' }, true)
+    expect(thinking!.act).toBeUndefined()
   })
 })

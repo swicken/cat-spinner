@@ -7,7 +7,8 @@ A Claude Code mod (a plugin of function hooks) that draws a pixel-art cat above 
 - `hooks/register.tsx` is the hooks module. It holds the animation state machine (`advance`, `inAnimation`, `pickAnimation`), composes each frame into Raster cells (`sceneCells`), and registers the hooks: the spinner drawing, the frame timer, `/cat-spinner`, and the settings dialog.
 - `hooks/rig.ts` is the cat itself: the coat palettes (`COATS`), the walking skeleton (`walkPose`, `standPose`, two-bone IK), the rasterizer with automatic outlines, and the hand-drawn seated cat (`SIT_ART`).
 - `hooks/yarn.ts` is the yarn and pounce play: ball physics, the chase rules, the swat, stalk, and leap poses, and drawing the ball.
-- `tests/cat.test.tsx` holds every test. `scripts/preview.ts` renders the README images in `assets/`.
+- `hooks/react.ts` is the reactions to Claude's tools: which tool means which activity (`activityOf`), the dig and startle poses, and the laptop, magnifying glass, and dirt drawn over the cat. The `tool.call` hook in `register.tsx` feeds it.
+- `tests/cat.test.tsx` holds the tests. `tests/scenes.ts` and `tests/golden.ts` are the golden scenes (below). `scripts/preview.ts` renders the README images in `assets/`.
 
 ## Checking a change
 
@@ -22,6 +23,14 @@ For a type check, load the plugin once with `--plugin-dir`. The engine then writ
 
 Tests can't show how anything looks in a terminal. For any visual change, render frames to an image and look at them before calling it done: decode `sceneCells` output (two pixels per cell, `▀`/`▄` with foreground and background colors) into a PNG, as `scripts/preview.ts` does. Reviewing enlarged frames caught most of the real problems in this project.
 
+## Golden scenes
+
+`tests/scenes.ts` scripts a set of scenes (every coat walking and sitting, a yarn session, a seeded pounce session, and the tool reactions) and the tests fingerprint every frame's pixels against `tests/golden.ts`. Any pixel change in any scene fails the test. That's the guard on the walk and the other tuned visuals.
+
+When a change is meant to alter the look, regenerate the file with `npx tsx scripts/fingerprints.ts > tests/golden.ts`, then check the diff: only the scenes you meant to change should have new fingerprints. Look at the new frames before accepting them. Never regenerate just to make a failing test pass. A changed fingerprint you didn't expect is a regression to investigate. (This caught a reaction getting stuck on its last frame.)
+
+When adding something visual, add a scene for it, so it's guarded from then on.
+
 ## Engine rules that bite
 
 - `$` may only be passed to functions declared at the top level of the file. The validator refuses anything else, so helpers that need `$` (like `startPreview`) live at the top level and take what they need as arguments.
@@ -34,8 +43,9 @@ Tests can't show how anything looks in a terminal. For any visual change, render
 
 - The cat moves exactly one pixel per frame, and the gait counter (`run`) advances one frame per pixel moved, backward when backing up. That's what keeps planted paws still on the ground. Never move the cat without moving `run` with it, except mid-leap, when its paws are in the air.
 - The walk was tuned until the user was happy with it. Don't change `walkPose` or the gait without being asked.
-- `yarn` is deterministic and must stay that way: it never calls the random function. Its preview GIF should come out byte-identical after any change that isn't meant to affect it, and so should every other GIF. A regenerated asset that changes unexpectedly means a regression.
+- `yarn` is deterministic and must stay that way: it never calls the random function. The golden scenes enforce the look, and the preview GIFs should also come out byte-identical after any change that isn't meant to affect them.
 - `pounce` and `random` take randomness through an injected `rng`, defaulting to `Math.random`. Tests pass a seeded generator.
+- Every branch of `advance` must return the cat with the `act` it just computed, never a copy of the old cat's. Returning a stale `act` once left the cat stuck on the last frame of a reaction.
 
 ## Adding a coat
 

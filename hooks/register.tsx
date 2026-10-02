@@ -1,6 +1,10 @@
 import type { EngineInterface, Register } from 'claude-code'
 
 import { blend, COATS, COLORS, drawCat, drawSitCat, H, standPose, useCoat, walkPose, W, type Coat, type Text, type Thought } from './rig'
+import {
+  ACT_FRAMES, activityOf, digPose, drawDirt, drawLaptop, drawMagnifier, isSeated, STARTLE_FRAMES, startlePose,
+  startleText, type Act, type Activity,
+} from './react'
 import { drawBall, playPose, rollBall, startPlay, stepPlay, type Play, type Rng } from './yarn'
 
 const FRAME_MS = 90
@@ -33,24 +37,41 @@ export const position = (run: number, track: number) => {
 
 // `sit` counts frames of sitting down, 0 (walking) to SIT_FRAMES (seated).
 // `play` is there in the yarn and pounce animations: where the cat and the ball are.
-export type Cat = { run: number; think: number; sit: number; play?: Play }
+// `act` is what the cat is doing about Claude's tools, if anything.
+export type Cat = { run: number; think: number; sit: number; play?: Play; act?: Act }
+
+// What Claude's tools are up to this frame: the activity of the tool running,
+// and whether a tool just failed or was denied.
+export type Work = { doing?: Activity; isStartled?: boolean }
+
+// The cat's next activity: a startle interrupts anything; a new tool's activity
+// replaces the last one; an activity outlives its tool by up to ACT_FRAMES.
+const nextAct = (act: Act | undefined, work: Work): Act | undefined => {
+  if (work.isStartled) return { kind: 'startle', frame: 0 }
+  if (act?.kind === 'startle') return act.frame < STARTLE_FRAMES ? { ...act, frame: act.frame + 1 } : undefined
+  if (work.doing && work.doing !== act?.kind) return { kind: work.doing, frame: 0 }
+  if (!act) return undefined
+  return work.doing || act.frame < ACT_FRAMES ? { ...act, frame: act.frame + 1 } : undefined
+}
 
 // What the cat does next frame: walk or play, or sit down and think while
 // Claude thinks. A rolling ball keeps rolling while the cat sits.
-export const advance = (cat: Cat, isThinking: boolean, track = W, rng: Rng = Math.random): Cat => {
-  if (isThinking || cat.sit > 0) {
-    const play = cat.play && { ...rollBall(cat.play, track), swat: 0, watch: 0, stalk: 0, leap: 0 }
-    if (isThinking) {
-      return cat.sit < SIT_FRAMES ? { ...cat, play, sit: cat.sit + 1 } : { ...cat, play, think: cat.think + 1 }
-    }
-    return { ...cat, play, sit: cat.sit - 1, think: 0 }
+export const advance = (cat: Cat, isThinking: boolean, track = W, rng: Rng = Math.random, work: Work = {}): Cat => {
+  const act = isThinking ? undefined : nextAct(cat.act, work)
+  // A startled cat is on its feet at once; one busy with a tool stays put.
+  const still = cat.play && { ...rollBall(cat.play, track), swat: 0, watch: 0, stalk: 0, leap: 0 }
+  if (act?.kind === 'startle') return { ...cat, act, play: still, sit: 0, think: 0 }
+  if (isThinking || isSeated(act)) {
+    return cat.sit < SIT_FRAMES ? { ...cat, act, play: still, sit: cat.sit + 1 } : { ...cat, act, play: still, think: cat.think + 1 }
   }
+  if (cat.sit > 0) return { ...cat, act, play: still, sit: cat.sit - 1, think: 0 }
+  if (act) return { ...cat, act, play: still }
   if (cat.play) {
     const { play, run } = stepPlay(cat.play, cat.run, track, rng)
-    return { ...cat, play, run }
+    return { ...cat, act, play, run }
   }
 
-  return { ...cat, run: cat.run + 1 }
+  return { ...cat, act, run: cat.run + 1 }
 }
 
 // The cat, carried into another animation from wherever it is: walking picks
@@ -91,11 +112,21 @@ export const sceneCells = (cat: Cat, track: number) => {
   const { x, isFacingRight } = cat.play ?? position(cat.run, track)
   const isBlinking = cat.run % 50 >= 48
   const moving = walkPose(cat.run, isBlinking)
-  const pose = cat.play ? playPose(cat.play, moving) : moving
-  const { canvas, texts } =
+  const act = cat.act
+  const pose =
+    act?.kind === 'startle' ? startlePose(act.frame)
+      : act?.kind === 'dig' && cat.sit === 0 ? digPose(act.frame)
+        : cat.play ? playPose(cat.play, moving) : moving
+  const drawn =
     cat.sit <= SETTLE_FRAMES
       ? drawCat(blend(pose, standPose(), smooth(cat.sit / SETTLE_FRAMES)), cat.sit === SETTLE_FRAMES)
-      : drawSitCat(cat.think, thoughtOf(cat))
+      : drawSitCat(cat.think, isSeated(act) ? undefined : thoughtOf(cat), isSeated(act))
+  const { canvas } = drawn
+  const texts = act?.kind === 'startle' ? [...drawn.texts, startleText(pose)] : drawn.texts
+  // The tools' props, over the cat.
+  if (act?.kind === 'dig' && cat.sit === 0) drawDirt(canvas, act.frame)
+  if (cat.sit === SIT_FRAMES && act?.kind === 'type') drawLaptop(canvas, act.frame, COLORS.paw)
+  if (cat.sit === SIT_FRAMES && act?.kind === 'search') drawMagnifier(canvas, act.frame, COLORS.paw, COLORS.eye, COLORS.pupil)
 
   // The track's pixels: the cat at x, then the ball wherever the cat is not
   // (its shadow aside), so a swatting paw stays in front of the ball.
@@ -331,6 +362,19 @@ export const register: Register = (on, options) => {
 
   let timer: { cancel: () => void } | undefined
   let isThinking = false
+  let doing: Activity | undefined
+  let isStartled = false
+
+  // Which tool is running sets the cat's activity; a failed or denied tool
+  // startles it.
+  on('tool.call', async ($, e, next) => {
+    const activity = activityOf(e.tool)
+    if (activity) doing = activity
+    const ran = await next(e)
+    if (ran.deny !== undefined || ran.isError === true) isStartled = true
+    if (activity && doing === activity) doing = undefined
+    return ran
+  })
   let cat: Cat = { run: 0, think: 0, sit: 0 }
   let requestId = ''
   let track = 0
@@ -339,7 +383,8 @@ export const register: Register = (on, options) => {
     if (animation === 'random') playing = pickAnimation(playing)
     timer ??= $.clock.every(FRAME_MS, () => {
       if (!requestId || !track) return
-      cat = advance(inAnimation(cat, playing, track), isThinking, track)
+      cat = advance(inAnimation(cat, playing, track), isThinking, track, Math.random, { doing, isStartled })
+      isStartled = false
       void $.ui.blit({ requestId, key: KEY, columns: track, rows: ROWS, cells: sceneCells(cat, track) })
     })
 
