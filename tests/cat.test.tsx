@@ -4,7 +4,7 @@ import { advance, inAnimation, pickAnimation, position, sceneCells, SIT_FRAMES, 
 import { ACT_FRAMES, activityOf, STARTLE_FRAMES } from '../hooks/react'
 import { COATS, CYCLE, pawAt, useCoat, W } from '../hooks/rig'
 import { BALL_R, startPlay } from '../hooks/yarn'
-import { isHalloweenOn } from '../hooks/season'
+import { isHalloweenOn, lanternSpots } from '../hooks/season'
 import { GOLDEN } from './golden'
 import { fingerprint, SCENES } from './scenes'
 
@@ -603,6 +603,34 @@ describe('Halloween', () => {
     const pumpkin = colors(cat, 90)
     expect(pumpkin.has(0xe8862c)).toBe(true) // the rind
     expect(pumpkin.has(0xd94a5a)).toBe(false) // no yarn
+  })
+
+  test('spreads jack-o\'-lanterns along the ground, about one per 45 columns', () => {
+    expect(lanternSpots(90)).toHaveLength(2)
+    expect(lanternSpots(200)).toHaveLength(4)
+    expect(lanternSpots(W + 4)).toHaveLength(1)
+    expect(colors({ run: 0, think: 0, sit: 0 }, 130).has(0xc96d1d)).toBe(true)
+  })
+
+  test('walks in front of the jack-o\'-lanterns', () => {
+    // The first lantern's rind, counted in its own columns only: a cat standing
+    // over it hides part of it, and a cat well clear of it hides none.
+    const track = 130
+    const left = lanternSpots(track)[0]!
+    const rind = (cat: Cat) => {
+      const words = new Uint32Array(Uint8Array.from(atob(sceneCells(cat, track, DECOR)), ch => ch.charCodeAt(0)).buffer)
+      let count = 0
+      for (let row = 0; row < 9; row++) {
+        for (let col = left; col < left + 7; col++) {
+          for (const k of [1, 2]) if (words[(row * track + col) * 3 + k] === 0xc96d1d) count++
+        }
+      }
+      return count
+    }
+    const over: Cat = { run: Math.max(0, left - 20), think: 0, sit: 0 } // the cat spans left - 20 to left + 19
+    const clear: Cat = { run: left + 10, think: 0, sit: 0 } // the cat starts past the lantern
+    expect(rind(clear)).toBeGreaterThan(0)
+    expect(rind(over)).toBeLessThan(rind(clear))
   })
 
   test('sends bats across the track', () => {

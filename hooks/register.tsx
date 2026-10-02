@@ -6,7 +6,7 @@ import {
   startleText, type Act, type Activity,
 } from './react'
 import {
-  drawBats, drawFrontHat, drawPumpkin, drawSideHat, drawSitHat, HALLOWEEN_THOUGHTS, isHalloweenOn, PLAIN, SEASONS,
+  drawBats, drawFrontHat, drawLanterns, drawPumpkin, drawSideHat, drawSitHat, HALLOWEEN_THOUGHTS, isHalloweenOn, PLAIN, SEASONS,
   type Decor, type Season,
 } from './season'
 import { drawBall, playPose, rollBall, startPlay, stepPlay, type Play, type Rng } from './yarn'
@@ -177,7 +177,8 @@ export const sceneCells = (cat: Cat, track: number, decor: Decor = PLAIN) => {
       filled[py * track + x + px] = 1
     }
   }
-  // The ball (or the season's pumpkin) and the bats go wherever the cat is not.
+  // The ball (or the season's pumpkin), the bats, and the jack-o'-lanterns go
+  // wherever nothing nearer is, so the cat passes in front of them.
   const inside = (px: number, py: number) => px >= 0 && px < track && py >= 0 && py < H
   const paint = (px: number, py: number, color: number) => {
     if (!inside(px, py)) return
@@ -186,7 +187,10 @@ export const sceneCells = (cat: Cat, track: number, decor: Decor = PLAIN) => {
   }
   const isFree = (px: number, py: number) => inside(px, py) && (!filled[py * track + px] || pixels[py * track + px] === COLORS.shadow)
   if (cat.play) (decor.isHalloween ? drawPumpkin : drawBall)(paint, isFree, cat.play)
-  if (decor.isHalloween) drawBats(paint, isFree, track, decor.time)
+  if (decor.isHalloween) {
+    drawBats(paint, isFree, track, decor.time)
+    drawLanterns(paint, isFree, track, decor.time, H - 2)
+  }
 
   const words = new Uint32Array(track * ROWS * 3)
   for (let i = 0; i < words.length; i += 3) words.set([0x20, DEFAULT_COLOR, DEFAULT_COLOR], i)

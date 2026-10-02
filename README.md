@@ -49,7 +49,7 @@ These set what the cat does while Claude works without a tool running.
 
 ## Seasons
 
-For Halloween, the cat dresses up: a little purple witch hat, a jack-o'-lantern in place of the ball of yarn, bats flapping across the track, and a cat that thinks `boo`. The **Season** setting decides when: **Auto** (the default) dresses it up through October and leaves it plain the rest of the year, **Halloween** keeps it on, and **Plain** keeps it off.
+For Halloween, the cat dresses up: a little purple witch hat, a jack-o'-lantern in place of the ball of yarn, bats flapping across the track, glowing jack-o'-lanterns on the ground behind it, and a cat that thinks `boo`. The **Season** setting decides when: **Auto** (the default) dresses it up through October and leaves it plain the rest of the year, **Halloween** keeps it on, and **Plain** keeps it off.
 
 ![The black cat in a witch hat, batting a jack-o'-lantern under the bats, then sitting to think "boo"](assets/preview-halloween.gif?v=1.9.0)
 

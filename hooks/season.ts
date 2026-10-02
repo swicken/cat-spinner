@@ -121,3 +121,44 @@ export const drawBats = (
     })
   }
 }
+
+const LANTERN: Record<string, number> = { O: 0x4a2208, R: 0xc96d1d, r: 0xa65815, S: 0x4a7a2a }
+const GLOW = [0xffd166, 0xffb347]
+// A carved jack-o'-lantern sitting on the ground: F is the glowing face.
+const LANTERN_ART = [
+  '...S...',
+  '.OrRrO.',
+  'ORFRFRO',
+  'ORrFrRO',
+  'ORFFFRO',
+  '.OrRrO.',
+]
+const LANTERN_SPACING = 45
+
+// Where the jack-o'-lanterns sit along a track: about one per 45 columns,
+// evenly spread.
+export const lanternSpots = (track: number) => {
+  const count = Math.max(1, Math.floor(track / LANTERN_SPACING))
+  return Array.from({ length: count }, (_, i) => Math.round(((i + 0.5) * track) / count) - 3)
+}
+
+// Jack-o'-lanterns behind everything, their faces flickering like candles.
+export const drawLanterns = (
+  paint: (x: number, y: number, color: number) => void,
+  isFree: (x: number, y: number) => boolean,
+  track: number,
+  time: number,
+  ground: number,
+) => {
+  lanternSpots(track).forEach((left, i) => {
+    const glow = GLOW[Math.floor(time / 3 + i * 2) % 3 === 0 ? 1 : 0]!
+    LANTERN_ART.forEach((line, row) => {
+      ;[...line].forEach((ch, col) => {
+        const x = left + col
+        const y = ground - LANTERN_ART.length + 1 + row
+        const color = ch === 'F' ? glow : LANTERN[ch]
+        if (color !== undefined && isFree(x, y)) paint(x, y, color)
+      })
+    })
+  })
+}
