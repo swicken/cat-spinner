@@ -153,16 +153,17 @@ export const sceneCells = (cat: Cat, track: number, decor: Decor = PLAIN) => {
       : drawSitCat(cat.think, isSeated(act) ? undefined : thoughtOf(cat, decor), isSeated(act))
   const { canvas } = drawn
   const texts = act?.kind === 'startle' ? [...drawn.texts, startleText(pose)] : drawn.texts
-  // The tools' props, over the cat.
-  if (act?.kind === 'dig' && cat.sit === 0) drawDirt(canvas, act.frame)
-  if (cat.sit === SIT_FRAMES && act?.kind === 'type') drawLaptop(canvas, act.frame, COLORS.paw)
-  if (cat.sit === SIT_FRAMES && act?.kind === 'search') drawMagnifier(canvas, act.frame, COLORS.paw, COLORS.eye, COLORS.pupil)
-  // The witch hat, on whichever way the head faces.
+  // The witch hat, on whichever way the head faces; the tools' props go over
+  // it, since the cat holds them up in front.
   if (decor.isHalloween) {
     if (cat.sit > SETTLE_FRAMES) drawSitHat(canvas)
     else if (isLookingOut) drawFrontHat(canvas, standing.head)
     else drawSideHat(canvas, standing.head)
   }
+  // The tools' props, over the cat.
+  if (act?.kind === 'dig' && cat.sit === 0) drawDirt(canvas, act.frame)
+  if (cat.sit === SIT_FRAMES && act?.kind === 'type') drawLaptop(canvas, act.frame, COLORS.paw)
+  if (cat.sit === SIT_FRAMES && act?.kind === 'search') drawMagnifier(canvas, act.frame, COLORS.paw, COLORS.eye, COLORS.pupil)
 
   // The track's pixels: the cat at x, then the ball wherever the cat is not
   // (its shadow aside), so a swatting paw stays in front of the ball.

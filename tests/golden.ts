@@ -14,4 +14,5 @@ export const GOLDEN: Record<string, string> = {
   'reactions': '0a94a42c',
   'halloween: walk and sit': '51127fa1',
   'halloween: yarn': 'b7198ecf',
+  'halloween: reactions': 'd6b2994f',
 }

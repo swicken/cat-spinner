@@ -32,12 +32,12 @@ const play = (isWild: boolean, frames: number, isHalloween = false) => {
 }
 
 // Claude's tools at work: typing, searching, digging, then a failed tool.
-const reactions = () => {
+const reactions = (isHalloween = false) => {
   const track = W + 10
   let cat: Cat = { run: 0, think: 0, sit: 0 }
   const frames: string[] = []
   const work = (count: number, first: Work, rest: Work) => {
-    for (let i = 0; i < count; i++) frames.push(sceneCells((cat = advance(cat, false, track, Math.random, i === 0 ? first : rest)), track))
+    for (let i = 0; i < count; i++) frames.push(sceneCells((cat = advance(cat, false, track, Math.random, i === 0 ? first : rest)), track, { isHalloween, time: frames.length }))
   }
   work(6, {}, {})
   work(20, { doing: 'type' }, { doing: 'type' })
@@ -52,9 +52,10 @@ export const SCENES: Record<string, () => string[]> = {
   ...Object.fromEntries((Object.keys(COATS) as Coat[]).map(coat => [`walk and sit: ${coat}`, () => walkAndSit(coat)])),
   yarn: () => play(false, 240),
   pounce: () => play(true, 320),
-  reactions,
+  reactions: () => reactions(),
   'halloween: walk and sit': () => walkAndSit('black', true),
   'halloween: yarn': () => play(false, 240, true),
+  'halloween: reactions': () => reactions(true),
 }
 
 // FNV-1a over every frame's cells: a short, stable fingerprint of the pixels.
