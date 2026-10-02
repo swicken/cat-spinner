@@ -10,7 +10,9 @@ export const SEASONS = ['auto', 'halloween', 'plain'] as const
 export type Season = (typeof SEASONS)[number]
 
 // `time` counts frames, for things that move on their own, like the bats.
-export type Decor = { isHalloween: boolean; time: number }
+// `seed` picks the scenery's layout, such as where the jack-o'-lanterns stand;
+// it's chosen once per load, so the layout holds steady through a session.
+export type Decor = { isHalloween: boolean; time: number; seed?: number }
 export const PLAIN: Decor = { isHalloween: false, time: 0 }
 
 // Auto turns Halloween on through October.
@@ -163,12 +165,27 @@ export const LANTERN_ARTS = [
   ],
 ]
 const LANTERN_SPACING = 45
+// How far a lantern may wander from the middle of its stretch of track, as a
+// share of the stretch: enough to look scattered, not enough to overlap.
+const LANTERN_WANDER = 0.55
 
-// The middle column of each jack-o'-lantern along a track: about one per 45
-// columns, evenly spread, big and small taking turns.
-export const lanternSpots = (track: number) => {
+// A repeatable number in 0..1 for a seed and an index.
+const hash = (seed: number, i: number) => ((Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(i + 1, 0xc2b2ae35)) >>> 0) % 10007 / 10007
+
+// Where each jack-o'-lantern stands along a track, and which one it is: about
+// one per 45 columns, each at a random spot in its own stretch of the track,
+// so they look scattered but never overlap. The same seed and track give the
+// same layout every time.
+export const lanternSpots = (track: number, seed = 0) => {
   const count = Math.max(1, Math.floor(track / LANTERN_SPACING))
-  return Array.from({ length: count }, (_, i) => Math.round(((i + 0.5) * track) / count))
+  const stretch = track / count
+  return Array.from({ length: count }, (_, i) => {
+    const art = hash(seed, i * 2 + 1) < 0.5 ? 0 : 1
+    const half = Math.ceil((LANTERN_ARTS[art]?.[0] ?? '').length / 2)
+    const wander = (hash(seed, i * 2) - 0.5) * stretch * LANTERN_WANDER
+    const middle = Math.round(Math.min(track - half, Math.max(half, (i + 0.5) * stretch + wander)))
+    return { middle, art }
+  })
 }
 
 // Jack-o'-lanterns behind everything, standing on the ground, their faces
@@ -179,9 +196,10 @@ export const drawLanterns = (
   track: number,
   time: number,
   ground: number,
+  seed: number,
 ) => {
-  lanternSpots(track).forEach((middle, i) => {
-    const art = LANTERN_ARTS[i % LANTERN_ARTS.length]!
+  lanternSpots(track, seed).forEach(({ middle, art: which }, i) => {
+    const art = LANTERN_ARTS[which]!
     const left = middle - Math.floor((art[0] ?? '').length / 2)
     const flicker = Math.floor(time / 3 + i * 2) % 3 === 0 ? 1 : 0
     art.forEach((line, row) => {

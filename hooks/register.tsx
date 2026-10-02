@@ -189,7 +189,7 @@ export const sceneCells = (cat: Cat, track: number, decor: Decor = PLAIN) => {
   if (cat.play) (decor.isHalloween ? drawPumpkin : drawBall)(paint, isFree, cat.play)
   if (decor.isHalloween) {
     drawBats(paint, isFree, track, decor.time)
-    drawLanterns(paint, isFree, track, decor.time, H - 2)
+    drawLanterns(paint, isFree, track, decor.time, H - 2, decor.seed ?? 0)
   }
 
   const words = new Uint32Array(track * ROWS * 3)
@@ -254,8 +254,10 @@ const SEASON_LABELS: Record<Season, string> = {
 // A setting change reloads the module (and this state with it), so
 // session.start starts it again when the dialog is still open.
 let preview: { timer: { cancel: () => void }; cat: Cat; playing: Playable; frame: number; track: number } | undefined
-// Whether the Halloween extras are on, as this load of the module resolved it.
+// Whether the Halloween extras are on, as this load of the module resolved it,
+// and the layout of its scenery, picked once per load.
 let isHalloween = false
+const sceneSeed = Math.floor(Math.random() * 2 ** 31)
 
 function startPreview($: EngineInterface, animation: Animation, playing: Playable) {
   if (preview) return
@@ -265,7 +267,7 @@ function startPreview($: EngineInterface, animation: Animation, playing: Playabl
     state.frame += 1
     if (animation === 'random' && state.frame % 70 === 0) state.playing = pickAnimation(state.playing)
     state.cat = advance(inAnimation(state.cat, state.playing, state.track), false, state.track)
-    void $.ui.blit({ requestId: SETTINGS, key: PREVIEW_KEY, columns: state.track, rows: ROWS, cells: sceneCells(state.cat, state.track, { isHalloween, time: state.frame }) })
+    void $.ui.blit({ requestId: SETTINGS, key: PREVIEW_KEY, columns: state.track, rows: ROWS, cells: sceneCells(state.cat, state.track, { isHalloween, time: state.frame, seed: sceneSeed }) })
   })
   preview = Object.assign(state, { timer })
 }
@@ -475,7 +477,7 @@ export const register: Register = (on, options) => {
       cat = advance(inAnimation(cat, playing, track), isThinking, track, Math.random, { doing, isStartled })
       isStartled = false
       frame += 1
-      void $.ui.blit({ requestId, key: KEY, columns: track, rows: ROWS, cells: sceneCells(cat, track, { isHalloween, time: frame }) })
+      void $.ui.blit({ requestId, key: KEY, columns: track, rows: ROWS, cells: sceneCells(cat, track, { isHalloween, time: frame, seed: sceneSeed }) })
     })
 
     return next(e)
@@ -500,7 +502,7 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="column">
         <Box key="track" marginLeft={trackOffset(e.viewport?.columns ?? 80, track, align)}>
-          <Raster key={KEY} columns={track} rows={ROWS} cells={sceneCells(cat, track, { isHalloween, time: frame })} />
+          <Raster key={KEY} columns={track} rows={ROWS} cells={sceneCells(cat, track, { isHalloween, time: frame, seed: sceneSeed })} />
         </Box>
         {await next(e)}
       </Box>

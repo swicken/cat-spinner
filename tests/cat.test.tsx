@@ -609,6 +609,22 @@ describe('Halloween', () => {
     expect(lanternSpots(90)).toHaveLength(2)
     expect(lanternSpots(200)).toHaveLength(4)
     expect(lanternSpots(W + 4)).toHaveLength(1)
+  })
+
+  test('scatters the jack-o\'-lanterns, the same way for the same seed, never overlapping', () => {
+    const middles = (seed: number) => lanternSpots(200, seed).map(spot => spot.middle)
+    expect(middles(7)).toEqual(middles(7))
+    expect(new Set([1, 2, 3, 4, 5].map(seed => middles(seed).join())).size).toBeGreaterThan(1)
+    for (let seed = 0; seed < 200; seed++) {
+      const spots = lanternSpots(200, seed)
+      const widths = spots.map(spot => (LANTERN_ARTS[spot.art]?.[0] ?? '').length)
+      spots.forEach((spot, i) => {
+        expect(spot.middle - widths[i]! / 2).toBeGreaterThanOrEqual(0)
+        expect(spot.middle + widths[i]! / 2).toBeLessThanOrEqual(200)
+        const next = spots[i + 1]
+        if (next) expect(next.middle - widths[i + 1]! / 2 - (spot.middle + widths[i]! / 2)).toBeGreaterThanOrEqual(2)
+      })
+    }
     expect(colors({ run: 0, think: 0, sit: 0 }, 130).has(0xc96d1d)).toBe(true)
   })
 
@@ -616,8 +632,9 @@ describe('Halloween', () => {
     // The first lantern's rind, counted in its own columns only: a cat standing
     // over it hides part of it, and a cat well clear of it hides none.
     const track = 130
-    const width = (LANTERN_ARTS[0]?.[0] ?? '').length
-    const left = lanternSpots(track)[0]! - Math.floor(width / 2)
+    const first = lanternSpots(track)[0]!
+    const width = (LANTERN_ARTS[first.art]?.[0] ?? '').length
+    const left = first.middle - Math.floor(width / 2)
     const rind = (cat: Cat) => {
       const words = new Uint32Array(Uint8Array.from(atob(sceneCells(cat, track, DECOR)), ch => ch.charCodeAt(0)).buffer)
       let count = 0
