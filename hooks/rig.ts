@@ -628,6 +628,14 @@ export const set = (canvas: Canvas, x: number, y: number, color: number) => {
   if ((canvas.owner[py * W + px] ?? EMPTY) === EMPTY) canvas.owner[py * W + px] = OUTLINE
 }
 
+// Erases a pixel back to empty, as if nothing were drawn there.
+export const clear = (canvas: Canvas, x: number, y: number) => {
+  const px = Math.floor(x), py = Math.floor(y)
+  if (px < 0 || px >= W || py < 0 || py >= H) return
+  canvas.color[py * W + px] = 0
+  canvas.owner[py * W + px] = EMPTY
+}
+
 // Legs shade from the coat at the hip or shoulder down to dark points at the paw.
 const legPaint = (isNear: boolean) => (shape: Shape) => {
   const t = 'a' in shape ? 1 : shape.t

@@ -3,7 +3,7 @@
 // cat thinks "boo". Drawing takes a Decor explicitly, so a plain Decor draws
 // exactly the plain cat.
 
-import { set, SIT_X, type Canvas, type Vec } from './rig'
+import { clear, set, SIT_X, type Canvas, type Vec } from './rig'
 import { BALL_R, BALL_Y, type Play } from './yarn'
 
 export const SEASONS = ['auto', 'halloween', 'plain'] as const
@@ -49,8 +49,16 @@ const stamp = (canvas: Canvas, hat: [number, number, string][], x: number, brim:
   }
 }
 
-// On a head in profile (or facing out, when the cat looks round to sit).
-export const drawSideHat = (canvas: Canvas, head: Vec) => stamp(canvas, SIDE_HAT, Math.round(head.x), Math.floor(head.y - 2.2))
+// On a head in profile, with the ears tucked under it: whatever of the head
+// rises above the brim is cleared first, so no ear pokes through the hat.
+export const drawSideHat = (canvas: Canvas, head: Vec) => {
+  const x = Math.round(head.x)
+  const brim = Math.floor(head.y - 2.2)
+  for (let y = 0; y < brim; y++) for (let dx = -7; dx <= 5; dx++) clear(canvas, x + dx, y)
+  stamp(canvas, SIDE_HAT, x, brim)
+}
+// On a head facing out, when the cat looks round to sit; its ears stand either
+// side of the cone, as they do on the seated cat.
 export const drawFrontHat = (canvas: Canvas, head: Vec) => stamp(canvas, FRONT_HAT, Math.round(head.x - 0.5), Math.floor(head.y - 2.2))
 // On the seated cat, between its ears, in the seated art's coordinates.
 export const drawSitHat = (canvas: Canvas) => stamp(canvas, FRONT_HAT, SIT_X + 9, 3)
