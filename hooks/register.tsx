@@ -1,7 +1,7 @@
 import type { Register } from 'claude-code'
 
 import { blend, COATS, COLORS, drawCat, drawSitCat, H, standPose, useCoat, walkPose, W, type Coat, type Text, type Thought } from './rig'
-import { drawBall, rollBall, startPlay, stepPlay, swatPose, type Play } from './yarn'
+import { drawBall, playPose, rollBall, startPlay, stepPlay, type Play, type Rng } from './yarn'
 
 const FRAME_MS = 90
 const KEY = 'cat'
@@ -16,8 +16,11 @@ const THOUGHTS = ['hmm', '...', ' ? ', 'hmm', ' ! ']
 
 const smooth = (t: number) => t * t * (3 - 2 * t)
 
-export const ANIMATIONS = ['walk', 'yarn'] as const
+export const ANIMATIONS = ['walk', 'yarn', 'pounce', 'random'] as const
 export type Animation = (typeof ANIMATIONS)[number]
+// What the cat can actually be doing; `random` picks one of these each turn.
+export const PLAYABLE = ['walk', 'yarn', 'pounce'] as const
+export type Playable = (typeof PLAYABLE)[number]
 
 // Where the cat stands on a track, and which way it faces, after `run` steps.
 export const position = (run: number, track: number) => {
@@ -29,25 +32,50 @@ export const position = (run: number, track: number) => {
 }
 
 // `sit` counts frames of sitting down, 0 (walking) to SIT_FRAMES (seated).
-// `play` is there in the yarn animation: where the cat and the ball are.
+// `play` is there in the yarn and pounce animations: where the cat and the ball are.
 export type Cat = { run: number; think: number; sit: number; play?: Play }
 
 // What the cat does next frame: walk or play, or sit down and think while
 // Claude thinks. A rolling ball keeps rolling while the cat sits.
-export const advance = (cat: Cat, isThinking: boolean, track = W): Cat => {
+export const advance = (cat: Cat, isThinking: boolean, track = W, rng: Rng = Math.random): Cat => {
   if (isThinking || cat.sit > 0) {
-    const play = cat.play && { ...rollBall(cat.play, track), swat: 0 }
+    const play = cat.play && { ...rollBall(cat.play, track), swat: 0, watch: 0, stalk: 0, leap: 0 }
     if (isThinking) {
       return cat.sit < SIT_FRAMES ? { ...cat, play, sit: cat.sit + 1 } : { ...cat, play, think: cat.think + 1 }
     }
     return { ...cat, play, sit: cat.sit - 1, think: 0 }
   }
   if (cat.play) {
-    const { play, run } = stepPlay(cat.play, cat.run, track)
+    const { play, run } = stepPlay(cat.play, cat.run, track, rng)
     return { ...cat, play, run }
   }
 
   return { ...cat, run: cat.run + 1 }
+}
+
+// The cat, carried into another animation from wherever it is: walking picks
+// up at the cat's spot and heading, and play starts with the ball ahead of it.
+export const inAnimation = (cat: Cat, playing: Playable, track: number): Cat => {
+  if (playing === 'walk') {
+    if (!cat.play) return cat
+    const span = Math.max(1, track - W)
+    const x = Math.max(0, Math.min(span, cat.play.x))
+    const { play: _, ...walking } = cat
+    return { ...walking, run: cat.play.isFacingRight ? x : 2 * span - x }
+  }
+  const isWild = playing === 'pounce'
+  if (!cat.play) {
+    const { x, isFacingRight } = position(cat.run, track)
+    return { ...cat, play: startPlay(track, x, isFacingRight, isWild) }
+  }
+  if (cat.play.isWild === isWild) return cat
+  return { ...cat, play: { ...cat.play, isWild, watch: 0, stalk: 0, leap: 0 } }
+}
+
+// A different animation from the last, for `random`.
+export const pickAnimation = (last: Playable | undefined, rng: Rng = Math.random): Playable => {
+  const choices = PLAYABLE.filter(name => name !== last)
+  return choices[Math.floor(rng() * choices.length)] ?? 'walk'
 }
 
 const thoughtOf = ({ sit, think }: Cat): Thought => {
@@ -63,7 +91,7 @@ export const sceneCells = (cat: Cat, track: number) => {
   const { x, isFacingRight } = cat.play ?? position(cat.run, track)
   const isBlinking = cat.run % 50 >= 48
   const moving = walkPose(cat.run, isBlinking)
-  const pose = cat.play && cat.play.swat > 0 ? swatPose(cat.play.swat, moving) : moving
+  const pose = cat.play ? playPose(cat.play, moving) : moving
   const { canvas, texts } =
     cat.sit <= SETTLE_FRAMES
       ? drawCat(blend(pose, standPose(), smooth(cat.sit / SETTLE_FRAMES)), cat.sit === SETTLE_FRAMES)
@@ -131,6 +159,7 @@ export const register: Register = (on, options) => {
   const animationOption = String(options.animation ?? 'walk')
   const animation: Animation = isAnimation(animationOption) ? animationOption : 'walk'
   useCoat(coat)
+  let playing: Playable = animation === 'random' ? pickAnimation(undefined) : animation
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -147,7 +176,8 @@ export const register: Register = (on, options) => {
     const choice = e.args.trim().toLowerCase()
     const list = (names: readonly string[]) => names.map(name => `/cat-spinner ${name}`).join(' or ')
     const usage = `Switch cats with ${list(COAT_NAMES)}, and animations with ${list(ANIMATIONS)}.`
-    if (!choice) return { text: `Your cat is the ${coat}, and the animation is ${animation}. ${usage}` }
+    const now = animation === 'random' ? `random (${playing} right now)` : animation
+    if (!choice) return { text: `Your cat is the ${coat}, and the animation is ${now}. ${usage}` }
     if (isCoat(choice)) {
       if (choice === coat) return { text: `Your cat is already the ${coat}.` }
       const { deny } = await $.config.set({ key: 'cat-spinner.coat', value: choice })
@@ -169,10 +199,10 @@ export const register: Register = (on, options) => {
   let track = 0
 
   on('prompt.submit', ($, e, next) => {
+    if (animation === 'random') playing = pickAnimation(playing)
     timer ??= $.clock.every(FRAME_MS, () => {
       if (!requestId || !track) return
-      if (animation === 'yarn' && !cat.play) cat = { ...cat, play: startPlay(track) }
-      cat = advance(cat, isThinking, track)
+      cat = advance(inAnimation(cat, playing, track), isThinking, track)
       void $.ui.blit({ requestId, key: KEY, columns: track, rows: ROWS, cells: sceneCells(cat, track) })
     })
 
@@ -192,7 +222,7 @@ export const register: Register = (on, options) => {
     isThinking = e.props.mode === 'thinking'
     requestId = e.requestId
     track = Math.min(90, Math.max(W + 4, (e.viewport?.columns ?? 80) - 6))
-    if (animation === 'yarn' && !cat.play) cat = { ...cat, play: startPlay(track) }
+    cat = inAnimation(cat, playing, track)
     const { Box, Raster } = $.ui.resolve(e)
 
     return (

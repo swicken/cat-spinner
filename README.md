@@ -2,7 +2,7 @@
 
 A pixel-art cat for the Claude Code spinner. While Claude works, the cat walks back and forth above the spinner line. When Claude starts thinking, it stops, looks at you, and sits down facing you with a thought bubble until the thinking is done, then gets up and walks on.
 
-There are two cats and two animations, and you can mix them freely.
+There are two cats and four animations, and you can mix them freely.
 
 ## Cats
 
@@ -21,6 +21,12 @@ There are two cats and two animations, and you can mix them freely.
 **Yarn:** the cat plays with a ball of yarn. It walks up to the ball, drops into a play-bow, and swats it with a front paw. The ball rolls away spinning, trailing a loose strand, and the cat chases it. Now and then it scoops the ball back under itself and has to turn around to follow it. When Claude thinks, the cat sits down facing you and the ball stays where it stopped.
 
 ![The orange tabby playing with a ball of yarn](assets/preview-yarn.gif)
+
+**Pounce:** the yarn game, but unpredictable. Each swat hits with a random strength and sometimes scoops the ball backward. Now and then the cat stops low to watch the ball roll, or stalks a ball that has nearly stopped: it crouches, wiggles its rear, and leaps onto it.
+
+![The Siamese stalking and pouncing on a ball of yarn](assets/preview-pounce.gif)
+
+**Random:** a different one of walk, yarn, and pounce each time Claude starts working. The cat carries on from wherever it is.
 
 > **Still in progress.** This is an early version and changes are still coming, so expect the cat to keep evolving.
 
@@ -56,7 +62,7 @@ Switch with a command:
 
 ```
 /cat-spinner orange      # or siamese
-/cat-spinner yarn        # or walk
+/cat-spinner pounce      # or walk, yarn, random
 ```
 
 Run `/cat-spinner` on its own to see what you have. Changes take effect right away. The same choices are the **Cat** and **Animation** rows for cat-spinner in `/config`, if you prefer the menu.
@@ -82,7 +88,7 @@ claude plugin marketplace remove cat-spinner
 The mod hooks the spinner's drawing and puts a 9-row pixel grid above the normal spinner line, so the word, elapsed time, and token count are still there. Each terminal cell shows two stacked pixels using a half-block character with separate foreground and background colors. While a turn runs, a timer repaints the grid about 11 times a second, and the timer stops when the turn ends.
 
 - **The walk** comes from a small skeleton rig (`hooks/rig.ts`). The legs move in a cat's walking order, so two or three paws are always on the ground. A planted paw stays on one spot of the ground while the body passes over it. The spine rocks slightly with each step, and the tail moves in a slow wave.
-- **The yarn play** (`hooks/yarn.ts`) is a small set of rules run each frame: the ball rolls with friction and bounces off the ends of the track; the cat faces the ball, walks up to it or backs away from it, waits for it to slow, then swats it in a seven-frame play-bow. The cat's gait advances one frame per pixel it moves, forward or back, so its paws stay planted while it walks.
+- **The yarn play** (`hooks/yarn.ts`) is a small set of rules run each frame: the ball rolls with friction and bounces off the ends of the track; the cat faces the ball, walks up to it or backs away from it, waits for it to slow, then swats it in a seven-frame play-bow. The cat's gait advances one frame per pixel it moves, forward or back, so its paws stay planted while it walks. Yarn plays out the same way every time; pounce adds random swat strength and scoops, pauses to watch, and a stalk that ends in a six-frame leap.
 - **The sit** is hand-drawn pixel art, because at this size a front-facing cat reads better drawn pixel by pixel. While seated, the cat blinks slowly, flicks its tail tip, and thinks `hmm`, `...`, `?`, and `!`.
 - **The colors** are a palette per coat (`COATS` in `hooks/rig.ts`): every shape uses a color role, such as coat, mask, muzzle, point, or paw, so a new cat is a new palette. The Siamese is a seal-point colorpoint based on a real cat.
 

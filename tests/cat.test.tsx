@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { advance, position, sceneCells, SIT_FRAMES, type Cat } from '../hooks/register'
+import { advance, inAnimation, pickAnimation, position, sceneCells, SIT_FRAMES, type Cat } from '../hooks/register'
 import { CYCLE, pawAt, W } from '../hooks/rig'
 import { BALL_R, startPlay } from '../hooks/yarn'
 
@@ -235,5 +235,83 @@ describe('switching animations with /cat-spinner', () => {
     expect(text).toContain('siamese')
     expect(text).toContain('walk')
     expect(text).toContain('/cat-spinner yarn')
+  })
+})
+
+// A repeatable stand-in for Math.random.
+const seeded = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32)
+
+describe('the pounce animation', () => {
+  const TRACK_P = 90
+  const session = (frames: number, seed: number, isWild = true) => {
+    const rng = seeded(seed)
+    let cat: Cat = { run: 0, think: 0, sit: 0, play: startPlay(TRACK_P, 0, true, isWild) }
+    const all = [cat]
+    for (let i = 0; i < frames; i++) all.push((cat = advance(cat, false, TRACK_P, rng)))
+    return all
+  }
+  const starts = (all: Cat[], key: 'watch' | 'stalk' | 'leap') =>
+    all.filter((cat, i) => i > 0 && cat.play![key] > 0 && all[i - 1]!.play![key] === 0).length
+
+  test('watches, stalks, and leaps onto the ball, differently each time', () => {
+    const runs = [7, 11, 23].map(seed => session(900, seed))
+    for (const all of runs) {
+      expect(starts(all, 'watch')).toBeGreaterThanOrEqual(3)
+      expect(starts(all, 'leap')).toBeGreaterThanOrEqual(2)
+    }
+    const timeline = (all: Cat[]) => all.map(cat => cat.play!.x).join()
+    expect(timeline(runs[0]!)).not.toBe(timeline(runs[1]!))
+  })
+
+  test('lands every leap with its paw on the ball', () => {
+    const all = session(900, 11)
+    all.forEach((cat, i) => {
+      const before = all[i - 1]
+      if (!before || before.play!.leap === 0 || cat.play!.leap !== 0) return
+      expect(cat.play!.swat).toBe(4) // straight into the swat's contact frame
+    })
+  })
+
+  test('keeps the cat and the ball on the track', () => {
+    for (const { play } of session(900, 23)) {
+      expect(play!.x).toBeGreaterThanOrEqual(0)
+      expect(play!.x).toBeLessThanOrEqual(TRACK_P - W)
+      expect(play!.ballX - BALL_R).toBeGreaterThanOrEqual(0)
+      expect(play!.ballX + BALL_R).toBeLessThanOrEqual(TRACK_P)
+    }
+  })
+
+  test('leaves the yarn animation exactly as it was: no randomness', () => {
+    const timeline = (all: Cat[]) => all.map(cat => `${cat.play!.x}:${cat.play!.ballX.toFixed(3)}`).join()
+    expect(timeline(session(600, 7, false))).toBe(timeline(session(600, 99, false)))
+  })
+})
+
+describe('random', () => {
+  test('never picks the same animation twice in a row', () => {
+    const rng = seeded(3)
+    let last = pickAnimation(undefined, rng)
+    for (let i = 0; i < 200; i++) {
+      const next = pickAnimation(last, rng)
+      expect(next).not.toBe(last)
+      last = next
+    }
+  })
+
+  test('carries the cat between animations from where it stands', () => {
+    const track = 90
+    const walking: Cat = { run: 63, think: 0, sit: 0 } // 13 cells back from the right end, heading left
+    const { x, isFacingRight } = position(walking.run, track)
+    const playing = inAnimation(walking, 'pounce', track)
+    expect(playing.play).toMatchObject({ x, isFacingRight, isWild: true })
+    const back = inAnimation(playing, 'walk', track)
+    expect(back.play).toBeUndefined()
+    expect(position(back.run, track)).toEqual({ x, isFacingRight })
+  })
+
+  test('switches with /cat-spinner random and says what it picked', { options: { animation: 'random' } }, async ($, on) => {
+    const RUN = { command: 'cat-spinner', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } } as const
+    const { text } = await $.command.run({ ...RUN, args: '' })
+    expect(text).toMatch(/random \((walk|yarn|pounce) right now\)/)
   })
 })

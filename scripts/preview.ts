@@ -1,6 +1,7 @@
 // Renders the README animations from the mod's real cell output: the walk in
-// each coat (assets/preview-<coat>.gif) and the yarn animation
-// (assets/preview-yarn.gif), each with a sit to think and a stand. Needs ffmpeg
+// each coat (assets/preview-<coat>.gif) and the yarn and pounce animations
+// (assets/preview-yarn.gif, assets/preview-pounce.gif), each with a sit to
+// think and a stand. Pounce uses a fixed seed, so its GIF is repeatable. Needs ffmpeg
 // on the PATH.
 //   npx tsx scripts/preview.ts
 import { execFileSync } from 'node:child_process'
@@ -105,10 +106,11 @@ const gif = (name: string, frames: Uint8Array[]) => {
 }
 
 // One scene: Claude working, then thinking, then working again.
-const scene = (start: Cat, working: number, thinking: number, after: number) => {
+const seeded = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32)
+const scene = (start: Cat, working: number, thinking: number, after: number, rng = seeded(23)) => {
   const script = [...Array(working).fill(false), ...Array(thinking).fill(true), ...Array(after).fill(false)] as boolean[]
   let cat = start
-  return script.map(isThinking => toImage(sceneCells((cat = advance(cat, isThinking, TRACK)), TRACK)))
+  return script.map(isThinking => toImage(sceneCells((cat = advance(cat, isThinking, TRACK, rng)), TRACK)))
 }
 
 mkdirSync('assets', { recursive: true })
@@ -118,3 +120,5 @@ for (const coat of Object.keys(COATS) as Coat[]) {
 }
 useCoat('orange')
 gif('preview-yarn', scene({ run: 0, think: 0, sit: 0, play: startPlay(TRACK) }, 170, 50, 20))
+useCoat('siamese')
+gif('preview-pounce', scene({ run: 0, think: 0, sit: 0, play: startPlay(TRACK, 0, true, true) }, 260, 40, 20, seeded(23)))
