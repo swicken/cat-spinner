@@ -1,6 +1,6 @@
 {
   "name": "cat-spinner",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "A pixel-art cat walks back and forth above the spinner, or plays with a ball of yarn, and sits down facing you to think while Claude thinks",
   "author": {
     "name": "Scott Wicken",
@@ -33,6 +33,27 @@
         "yarn",
         "pounce",
         "random"
+      ]
+    },
+    "width": {
+      "type": "string",
+      "title": "Width",
+      "description": "How much of the terminal's width the cat walks across",
+      "default": "full",
+      "options": [
+        "full",
+        "compact"
+      ]
+    },
+    "align": {
+      "type": "string",
+      "title": "Alignment",
+      "description": "Where a compact track sits: left, center, or right",
+      "default": "left",
+      "options": [
+        "left",
+        "center",
+        "right"
       ]
     }
   }

@@ -21,6 +21,28 @@ const THOUGHTS = ['hmm', '...', ' ? ', 'hmm', ' ! ']
 const smooth = (t: number) => t * t * (3 - 2 * t)
 
 export const ANIMATIONS = ['walk', 'yarn', 'pounce', 'random'] as const
+export const WIDTHS = ['full', 'compact'] as const
+export type Width = (typeof WIDTHS)[number]
+export const ALIGNS = ['left', 'center', 'right'] as const
+export type Align = (typeof ALIGNS)[number]
+
+// The most a Raster takes, and the compact track's cap.
+const MAX_TRACK = 512
+const COMPACT_TRACK = 90
+
+// How wide the cat's track is in a terminal `columns` wide: the whole width
+// (less a small margin, so nothing wraps), or capped for compact.
+export const trackWidth = (columns: number, width: Width) => {
+  const room = width === 'full' ? columns - 2 : Math.min(COMPACT_TRACK, columns - 6)
+  return Math.min(MAX_TRACK, Math.max(W + 4, room))
+}
+
+// How far in from the left a track `track` wide sits in a terminal `columns`
+// wide; only a compact track is narrower than the terminal.
+export const trackOffset = (columns: number, track: number, align: Align) => {
+  const spare = Math.max(0, columns - 2 - track)
+  return align === 'left' ? 0 : align === 'center' ? Math.floor(spare / 2) : spare
+}
 export type Animation = (typeof ANIMATIONS)[number]
 // What the cat can actually be doing; `random` picks one of these each turn.
 export const PLAYABLE = ['walk', 'yarn', 'pounce'] as const
@@ -200,6 +222,11 @@ const ANIMATION_LABELS: Record<Animation, string> = {
   pounce: 'Pounce: yarn, with random swats, stalking, and leaps',
   random: 'Random: a different one each time Claude works',
 }
+const WIDTH_LABELS: Record<Width, string> = {
+  full: 'Full width',
+  compact: 'Compact: up to 90 columns',
+}
+const ALIGN_LABELS: Record<Align, string> = { left: 'Left', center: 'Center', right: 'Right' }
 
 // The dialog's live preview: its own cat, playing while the dialog is open.
 // A setting change reloads the module (and this state with it), so
@@ -221,7 +248,7 @@ function startPreview($: EngineInterface, animation: Animation, playing: Playabl
 
 // Which setting the dialog is showing the options of, or none for the list of
 // settings. A pick reloads the module, which puts the dialog back on the list.
-let editing: 'coat' | 'animation' | undefined
+let editing: 'coat' | 'animation' | 'width' | 'align' | undefined
 
 function stopPreview() {
   preview?.timer.cancel()
@@ -231,12 +258,18 @@ function stopPreview() {
 const COAT_NAMES = Object.keys(COATS) as Coat[]
 const isCoat = (name: string): name is Coat => (COAT_NAMES as string[]).includes(name)
 const isAnimation = (name: string): name is Animation => (ANIMATIONS as readonly string[]).includes(name)
+const isWidth = (name: string): name is Width => (WIDTHS as readonly string[]).includes(name)
+const isAlign = (name: string): name is Align => (ALIGNS as readonly string[]).includes(name)
 
 export const register: Register = (on, options) => {
   const coatOption = String(options.coat ?? 'siamese')
   const coat: Coat = isCoat(coatOption) ? coatOption : 'siamese'
   const animationOption = String(options.animation ?? 'walk')
   const animation: Animation = isAnimation(animationOption) ? animationOption : 'walk'
+  const widthOption = String(options.width ?? 'full')
+  const width: Width = isWidth(widthOption) ? widthOption : 'full'
+  const alignOption = String(options.align ?? 'left')
+  const align: Align = isAlign(alignOption) ? alignOption : 'left'
   useCoat(coat)
   let playing: Playable = animation === 'random' ? pickAnimation(undefined) : animation
 
@@ -277,10 +310,14 @@ export const register: Register = (on, options) => {
       $.ui.invalidate('ui.render')
       $.clock.after(50, () => void $.ui.focus({ requestId: SETTINGS, key: focus }))
     }
-    const settings = [
+    const every = [
       { key: 'coat', label: 'Cat', current: coat as string, names: COAT_NAMES as readonly string[], labels: COAT_LABELS as Record<string, string> },
       { key: 'animation', label: 'Animation', current: animation as string, names: ANIMATIONS as readonly string[], labels: ANIMATION_LABELS as Record<string, string> },
+      { key: 'width', label: 'Width', current: width as string, names: WIDTHS as readonly string[], labels: WIDTH_LABELS as Record<string, string> },
+      { key: 'align', label: 'Alignment', current: align as string, names: ALIGNS as readonly string[], labels: ALIGN_LABELS as Record<string, string> },
     ] as const
+    // Alignment only matters for a compact track, which is narrower than the terminal.
+    const settings = every.filter(setting => setting.key !== 'align' || width === 'compact')
     const open = settings.find(setting => setting.key === editing)
 
     // The list of settings, each showing its current choice; or the options
@@ -328,13 +365,15 @@ export const register: Register = (on, options) => {
     )
   })
 
-  // Switching writes the plugin's own "Cat" or "Animation" setting, the same
-  // ones /config shows, so the module reloads with the new choice.
+  // Switching writes the plugin's own "Cat", "Animation", "Width", or
+  // "Alignment" setting, the same ones /config shows, so the module reloads
+  // with the new choice.
   on('command.run', { command: 'cat-spinner' }, async ($, e) => {
     const choice = e.args.trim().toLowerCase()
     const list = (names: readonly string[]) => names.map(name => `/cat-spinner ${name}`).join(' or ')
-    const usage = `Switch cats with ${list(COAT_NAMES)}, and animations with ${list(ANIMATIONS)}.`
-    const now = animation === 'random' ? `random (${playing} right now)` : animation
+    const usage = `Switch cats with ${list(COAT_NAMES)}, animations with ${list(ANIMATIONS)}, the width with ${list(WIDTHS)}, and a compact track's alignment with ${list(ALIGNS)}.`
+    const where = width === 'compact' ? `compact width, ${align}-aligned` : 'full width'
+    const now = `${animation === 'random' ? `random (${playing} right now)` : animation}, at ${where}`
     if (!choice) {
       // Where no dialog can open (a headless run, say), answer in text instead.
       const opened = await $.ui
@@ -355,6 +394,19 @@ export const register: Register = (on, options) => {
       if (choice === animation) return { text: `The animation is already ${animation}.` }
       const { deny } = await $.config.set({ key: 'cat-spinner.animation', value: choice })
       return { text: deny ? `Couldn't switch animations: ${deny}` : `Switched to the ${choice} animation.` }
+    }
+
+    if (isWidth(choice)) {
+      if (choice === width) return { text: `The width is already ${width}.` }
+      const { deny } = await $.config.set({ key: 'cat-spinner.width', value: choice })
+      return { text: deny ? `Couldn't switch the width: ${deny}` : `Switched to ${choice} width.` }
+    }
+
+    if (isAlign(choice)) {
+      if (choice === align) return { text: `The alignment is already ${align}.` }
+      const { deny } = await $.config.set({ key: 'cat-spinner.align', value: choice })
+      if (deny) return { text: `Couldn't switch the alignment: ${deny}` }
+      return { text: width === 'compact' ? `Aligned ${choice}.` : `Aligned ${choice}; it shows once the width is compact (/cat-spinner compact).` }
     }
 
     return { text: `There's no "${choice}". ${usage}` }
@@ -403,13 +455,15 @@ export const register: Register = (on, options) => {
     if (e.surface !== 'terminal') return next(e)
     isThinking = e.props.mode === 'thinking'
     requestId = e.requestId
-    track = Math.min(90, Math.max(W + 4, (e.viewport?.columns ?? 80) - 6))
+    track = trackWidth(e.viewport?.columns ?? 80, width)
     cat = inAnimation(cat, playing, track)
     const { Box, Raster } = $.ui.resolve(e)
 
     return (
       <Box flexDirection="column">
-        <Raster key={KEY} columns={track} rows={ROWS} cells={sceneCells(cat, track)} />
+        <Box key="track" marginLeft={trackOffset(e.viewport?.columns ?? 80, track, align)}>
+          <Raster key={KEY} columns={track} rows={ROWS} cells={sceneCells(cat, track)} />
+        </Box>
         {await next(e)}
       </Box>
     )

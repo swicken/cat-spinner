@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { advance, inAnimation, pickAnimation, position, sceneCells, SIT_FRAMES, type Cat, type Work } from '../hooks/register'
+import { advance, inAnimation, pickAnimation, position, sceneCells, SIT_FRAMES, trackOffset, trackWidth, type Cat, type Work } from '../hooks/register'
 import { ACT_FRAMES, activityOf, STARTLE_FRAMES } from '../hooks/react'
 import { COATS, CYCLE, pawAt, useCoat, W } from '../hooks/rig'
 import { BALL_R, startPlay } from '../hooks/yarn'
@@ -495,5 +495,80 @@ describe("reacting to Claude's tools", () => {
     const digging = frames(WALKING, 3, { doing: 'dig' }).at(-1)!
     const [thinking] = frames(digging, 1, { doing: 'dig' }, true)
     expect(thinking!.act).toBeUndefined()
+  })
+})
+
+describe('width', () => {
+  test('spans the terminal at full width, less a small margin', () => {
+    expect(trackWidth(200, 'full')).toBe(198)
+    expect(trackWidth(120, 'full')).toBe(118)
+  })
+
+  test('caps the track at 90 columns when compact', () => {
+    expect(trackWidth(200, 'compact')).toBe(90)
+    expect(trackWidth(80, 'compact')).toBe(74)
+  })
+
+  test('always leaves room for the cat to move, and never passes the grid limit', () => {
+    expect(trackWidth(20, 'full')).toBe(W + 4)
+    expect(trackWidth(20, 'compact')).toBe(W + 4)
+    expect(trackWidth(4000, 'full')).toBe(512)
+  })
+
+  test('switches with /cat-spinner compact by writing the Width setting', async ($, on) => {
+    const RUN = { command: 'cat-spinner', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } } as const
+    const writes: unknown[] = []
+    on('config.set', (_$, e) => {
+      writes.push({ key: e.key, value: e.value })
+      return { value: e.value }
+    })
+    const { text } = await $.command.run({ ...RUN, args: 'compact' })
+    expect(writes).toEqual([{ key: 'cat-spinner.width', value: 'compact' }])
+    expect(text).toBe('Switched to compact width.')
+  })
+
+  test('places a compact track left, center, or right', () => {
+    // 200 columns, less the 2-column margin, leaves 108 spare beside a 90-column track.
+    expect(trackOffset(200, 90, 'left')).toBe(0)
+    expect(trackOffset(200, 90, 'center')).toBe(54)
+    expect(trackOffset(200, 90, 'right')).toBe(108)
+    expect(trackOffset(200, 198, 'right')).toBe(0) // a full-width track has nothing spare
+  })
+
+  test('draws a compact track centered when asked', { options: { width: 'compact', align: 'center' } }, async ($, on) => {
+    await engineSpinner($, on)
+    const ui = await $.ui.mount({ ...SPINNER, viewport: { columns: 160, rows: 40 } } as typeof SPINNER)
+    expect((await ui.find({ type: 'Raster', key: 'cat' }))?.props.columns).toBe(90)
+    expect((await ui.find({ type: 'Box', key: 'track' }))?.props.marginLeft).toBe(34)
+    await ui.unmount()
+  })
+
+  const DIALOG_PANE = {
+    plugin: 'cat-spinner', surface: 'terminal', component: 'Pane', requestId: 'cat-spinner-settings',
+    props: { title: 'cat-spinner', isFocused: true, bodyColumns: 70, placement: 'inline', scroll: { offset: 0, bodyRows: 14 }, view: {} },
+  } as const
+
+  test('offers Alignment in the dialog once the track is compact', { options: { width: 'compact' } }, async $ => {
+    const ui = await $.ui.mount(DIALOG_PANE)
+    expect((await ui.find({ type: 'Button', key: 'edit-align' }))?.text).toContain('Alignment: Left')
+    await ui.unmount()
+  })
+
+  test('offers Alignment in the dialog only for a compact track', async $ => {
+    const dialog = {
+      plugin: 'cat-spinner', surface: 'terminal', component: 'Pane', requestId: 'cat-spinner-settings',
+      props: { title: 'cat-spinner', isFocused: true, bodyColumns: 70, placement: 'inline', scroll: { offset: 0, bodyRows: 14 }, view: {} },
+    } as const
+    const ui = await $.ui.mount(dialog)
+    expect(await ui.find({ type: 'Button', key: 'edit-width' })).toBeDefined()
+    expect(await ui.find({ type: 'Button', key: 'edit-align' })).toBeUndefined()
+    await ui.unmount()
+  })
+
+  test('draws the track as wide as the terminal allows', async ($, on) => {
+    await engineSpinner($, on)
+    const ui = await $.ui.mount({ ...SPINNER, viewport: { columns: 160, rows: 40 } } as typeof SPINNER)
+    expect((await ui.find({ type: 'Raster', key: 'cat' }))?.props.columns).toBe(158)
+    await ui.unmount()
   })
 })

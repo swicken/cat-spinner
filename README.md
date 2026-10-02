@@ -73,20 +73,24 @@ claude plugin install cat-spinner@cat-spinner
 
 Then start a new Claude Code session. The cat appears the next time Claude is working on something.
 
-The install may say userConfig options are not yet set. Those are the choices of cat and animation, and it's fine to leave them: you get the walking Siamese, and you can switch any time (below).
+The install may say userConfig options are not yet set. Those are the settings below, and it's fine to leave them: you get the walking Siamese at full width, and you can change any of them at any time.
 
 ## Choosing your cat and animation
 
-Run `/cat-spinner` to open its settings: a live preview of your cat above a list of settings, **Cat** and **Animation**, each showing its current choice. Move with the arrow keys and press Enter on a setting to see its options, then Enter again to pick one. Changes save as you pick them, and the preview updates to match. In a setting's options Esc goes back to the list; in the list, Esc or **Done** closes.
+Run `/cat-spinner` to open its settings: a live preview of your cat above a list of settings, each showing its current choice: **Cat**, **Animation**, **Width**, and, for a compact track, **Alignment**. Move with the arrow keys and press Enter on a setting to see its options, then Enter again to pick one. Changes save as you pick them, and the preview updates to match. In a setting's options Esc goes back to the list; in the list, Esc or **Done** closes.
 
 There are shortcuts too, if you know what you want:
 
 ```
 /cat-spinner calico      # or siamese, orange, tuxedo, black, russian-blue, white, tortoiseshell
 /cat-spinner pounce      # or walk, yarn, random
+/cat-spinner compact     # or full
+/cat-spinner center      # or left, right
 ```
 
-The same choices are the **Cat** and **Animation** rows for cat-spinner in `/config`.
+**Width** sets how much of the terminal the cat walks across. **Full width**, the default, spans the whole window and follows it as you resize. **Compact** caps the track at 90 columns, for shorter walks. A compact track sits at the left by default, and **Alignment** moves it to the center or the right.
+
+The same choices are the **Cat**, **Animation**, **Width**, and **Alignment** rows for cat-spinner in `/config`.
 
 ## Update and uninstall
 
@@ -106,7 +110,7 @@ claude plugin marketplace remove cat-spinner
 
 ## How it works
 
-The mod hooks the spinner's drawing and puts a 9-row pixel grid above the normal spinner line, so the word, elapsed time, and token count are still there. Each terminal cell shows two stacked pixels using a half-block character with separate foreground and background colors. While a turn runs, a timer repaints the grid about 11 times a second, and the timer stops when the turn ends.
+The mod hooks the spinner's drawing and puts a 9-row pixel grid, as wide as the Width setting allows, above the normal spinner line, so the word, elapsed time, and token count are still there. Each terminal cell shows two stacked pixels using a half-block character with separate foreground and background colors. While a turn runs, a timer repaints the grid about 11 times a second, and the timer stops when the turn ends.
 
 - **The walk** comes from a small skeleton rig (`hooks/rig.ts`). The legs move in a cat's walking order, so two or three paws are always on the ground. A planted paw stays on one spot of the ground while the body passes over it. The spine rocks slightly with each step, and the tail moves in a slow wave.
 - **The yarn play** (`hooks/yarn.ts`) is a small set of rules run each frame: the ball rolls with friction and bounces off the ends of the track; the cat faces the ball, walks up to it or backs away from it, waits for it to slow, then swats it in a seven-frame play-bow. The cat's gait advances one frame per pixel it moves, forward or back, so its paws stay planted while it walks. Yarn plays out the same way every time; pounce adds random swat strength and scoops, pauses to watch, and a stalk that ends in a six-frame leap.
