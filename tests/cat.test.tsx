@@ -131,7 +131,18 @@ describe('coats', () => {
 describe('the /cat-spinner command', () => {
   const RUN = { command: 'cat-spinner', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } } as const
 
-  test('says which cat you have', async $ => {
+  test('opens the settings dialog', async ($, on) => {
+    const opened: string[] = []
+    on('ui.open', (_$, e) => {
+      opened.push(e.id)
+      return { value: { isPlaced: true as const } }
+    })
+    const { text } = await $.command.run({ ...RUN, args: '' })
+    expect(opened).toEqual(['cat-spinner-settings'])
+    expect(text).toContain('settings are open')
+  })
+
+  test('says which cat you have, with the shortcuts, where no dialog can open', async $ => {
     const { text } = await $.command.run({ ...RUN, args: '' })
     expect(text).toContain('siamese')
     expect(text).toContain('/cat-spinner orange')
@@ -313,5 +324,41 @@ describe('random', () => {
     const RUN = { command: 'cat-spinner', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } } as const
     const { text } = await $.command.run({ ...RUN, args: '' })
     expect(text).toMatch(/random \((walk|yarn|pounce) right now\)/)
+  })
+})
+
+describe('the settings dialog', () => {
+  const DIALOG = {
+    plugin: 'cat-spinner',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'cat-spinner-settings',
+    props: { title: 'cat-spinner', isFocused: true, bodyColumns: 70, placement: 'inline', scroll: { offset: 0, bodyRows: 14 }, view: {} },
+  } as const
+
+  test('shows a preview and both pickers, set to the current choices', { options: { coat: 'orange', animation: 'pounce' } }, async $ => {
+    const ui = await $.ui.mount(DIALOG)
+    expect(await ui.find({ type: 'Raster', key: 'preview' })).toBeDefined()
+    expect((await ui.find({ type: 'Select', key: 'coat' }))?.props.value).toBe('orange')
+    expect((await ui.find({ type: 'Select', key: 'animation' }))?.props.value).toBe('pounce')
+    expect(await ui.find({ type: 'Button', key: 'done' })).toBeDefined()
+    await ui.unmount()
+  })
+
+  test('saves a pick to its setting, and nothing for the current choice', async ($, on) => {
+    const writes: unknown[] = []
+    on('config.set', (_$, e) => {
+      writes.push({ key: e.key, value: e.value })
+      return { value: e.value }
+    })
+    const ui = await $.ui.mount(DIALOG)
+    await ui.select({ key: 'animation', value: 'yarn' })
+    await ui.select({ key: 'coat', value: 'siamese' })
+    await ui.select({ key: 'coat', value: 'orange' })
+    expect(writes).toEqual([
+      { key: 'cat-spinner.animation', value: 'yarn' },
+      { key: 'cat-spinner.coat', value: 'orange' },
+    ])
+    await ui.unmount()
   })
 })

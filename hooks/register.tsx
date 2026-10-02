@@ -1,4 +1,4 @@
-import type { Register } from 'claude-code'
+import type { EngineInterface, Register } from 'claude-code'
 
 import { blend, COATS, COLORS, drawCat, drawSitCat, H, standPose, useCoat, walkPose, W, type Coat, type Text, type Thought } from './rig'
 import { drawBall, playPose, rollBall, startPlay, stepPlay, type Play, type Rng } from './yarn'
@@ -149,6 +149,41 @@ export const sceneCells = (cat: Cat, track: number) => {
   return btoa(binary)
 }
 
+// The settings dialog /cat-spinner opens, and what its pickers show.
+const SETTINGS = 'cat-spinner-settings'
+const PREVIEW_KEY = 'preview'
+const PREVIEW_WIDTH = 60
+const COAT_LABELS: Record<Coat, string> = { siamese: 'Siamese', orange: 'Orange tabby' }
+const ANIMATION_LABELS: Record<Animation, string> = {
+  walk: 'Walk: back and forth',
+  yarn: 'Yarn: swats a ball of yarn',
+  pounce: 'Pounce: yarn, with random swats, stalking, and leaps',
+  random: 'Random: a different one each time Claude works',
+}
+
+// The dialog's live preview: its own cat, playing while the dialog is open.
+// A setting change reloads the module (and this state with it), so
+// session.start starts it again when the dialog is still open.
+let preview: { timer: { cancel: () => void }; cat: Cat; playing: Playable; frame: number; track: number } | undefined
+
+function startPreview($: EngineInterface, animation: Animation, playing: Playable) {
+  if (preview) return
+  const state = { cat: { run: 0, think: 0, sit: 0 } as Cat, playing, frame: 0, track: 0 }
+  const timer = $.clock.every(FRAME_MS, () => {
+    if (!state.track) return
+    state.frame += 1
+    if (animation === 'random' && state.frame % 70 === 0) state.playing = pickAnimation(state.playing)
+    state.cat = advance(inAnimation(state.cat, state.playing, state.track), false, state.track)
+    void $.ui.blit({ requestId: SETTINGS, key: PREVIEW_KEY, columns: state.track, rows: ROWS, cells: sceneCells(state.cat, state.track) })
+  })
+  preview = Object.assign(state, { timer })
+}
+
+function stopPreview() {
+  preview?.timer.cancel()
+  preview = undefined
+}
+
 const COAT_NAMES = Object.keys(COATS) as Coat[]
 const isCoat = (name: string): name is Coat => (COAT_NAMES as string[]).includes(name)
 const isAnimation = (name: string): name is Animation => (ANIMATIONS as readonly string[]).includes(name)
@@ -164,10 +199,56 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'cat-spinner',
-      description: `Show or switch your cat or its animation: /cat-spinner ${[...COAT_NAMES, ...ANIMATIONS].join(' | ')}`,
+      description: 'Pick your cat and its animation (or /cat-spinner orange, /cat-spinner pounce, ...)',
     })
+    if ((await $.ui.panes()).some(pane => pane.id === SETTINGS)) startPreview($, animation, playing)
 
     return next(e)
+  })
+
+  on('ui.close', { id: SETTINGS }, ($, e, next) => {
+    stopPreview()
+
+    return next(e)
+  })
+
+  on('ui.render', { component: 'Pane', requestId: SETTINGS }, async ($, e) => {
+    // The preview and pickers need the terminal's Raster and Select.
+    if (e.surface !== 'terminal') {
+      const { Text } = $.ui.resolve(e)
+      return <Text>Switch with /cat-spinner siamese, orange, walk, yarn, pounce, or random.</Text>
+    }
+    const { Box, Button, Raster, Select, Text } = $.ui.resolve(e)
+    const track = Math.max(W + 4, Math.min(PREVIEW_WIDTH, e.props.bodyColumns))
+    if (preview) preview.track = track
+    const choose = (key: 'coat' | 'animation', current: string) => (value: string) => {
+      if (value !== current) void $.config.set({ key: `cat-spinner.${key}`, value })
+    }
+
+    return (
+      <Box flexDirection="column">
+        <Raster key={PREVIEW_KEY} columns={track} rows={ROWS} cells={sceneCells(preview?.cat ?? { run: 0, think: 0, sit: 0 }, track)} />
+        <Select
+          key="coat"
+          label="Cat: "
+          autoFocus
+          value={coat}
+          options={COAT_NAMES.map(value => ({ value, label: COAT_LABELS[value] }))}
+          onSelect={choose('coat', coat)}
+        />
+        <Select
+          key="animation"
+          label="Animation: "
+          value={animation}
+          options={ANIMATIONS.map(value => ({ value, label: ANIMATION_LABELS[value] }))}
+          onSelect={choose('animation', animation)}
+        />
+        <Box>
+          <Button key="done" label="Done" role="dismiss" onPress={() => void $.ui.close({ id: SETTINGS })} />
+          <Text dimColor> Changes save as you pick them. Esc closes.</Text>
+        </Box>
+      </Box>
+    )
   })
 
   // Switching writes the plugin's own "Cat" or "Animation" setting, the same
@@ -177,7 +258,17 @@ export const register: Register = (on, options) => {
     const list = (names: readonly string[]) => names.map(name => `/cat-spinner ${name}`).join(' or ')
     const usage = `Switch cats with ${list(COAT_NAMES)}, and animations with ${list(ANIMATIONS)}.`
     const now = animation === 'random' ? `random (${playing} right now)` : animation
-    if (!choice) return { text: `Your cat is the ${coat}, and the animation is ${now}. ${usage}` }
+    if (!choice) {
+      // Where no dialog can open (a headless run, say), answer in text instead.
+      const opened = await $.ui
+        .open({ id: SETTINGS, title: 'cat-spinner', focus: true, closeOnEscape: true, holdToasts: true, rows: ROWS + 5 })
+        .catch(() => undefined)
+      if (opened?.isPlaced) {
+        startPreview($, animation, playing)
+        return { text: `Your cat is the ${coat}, and the animation is ${now}. The cat-spinner settings are open.` }
+      }
+      return { text: `Your cat is the ${coat}, and the animation is ${now}. ${usage}` }
+    }
     if (isCoat(choice)) {
       if (choice === coat) return { text: `Your cat is already the ${coat}.` }
       const { deny } = await $.config.set({ key: 'cat-spinner.coat', value: choice })
