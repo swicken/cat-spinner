@@ -1,14 +1,15 @@
-// Renders assets/preview.gif, the README animation, from the mod's real cell
-// output: a walk, a sit to think, and a stand. Needs ffmpeg on the PATH.
+// Renders the README animations, assets/preview-<coat>.gif for each coat, from
+// the mod's real cell output: a walk, a sit to think, and a stand. Needs ffmpeg
+// on the PATH.
 //   npx tsx scripts/preview.ts
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { crc32, deflateSync } from 'node:zlib'
 
 import { advance, sceneCells, type Cat } from '../hooks/register.tsx'
-import { H } from '../hooks/rig.ts'
+import { COATS, H, useCoat, type Coat } from '../hooks/rig.ts'
 
 const TRACK = 70
 const ROWS = H / 2
@@ -68,37 +69,43 @@ const scanlines = (img: Uint8Array, w: number, h: number) => {
 
 // The scene: walk, sit to think, then get up and walk on.
 const script = [...Array(70).fill(false), ...Array(55).fill(true), ...Array(30).fill(false)] as boolean[]
-let cat: Cat = { run: 0, think: 0, sit: 0 }
-const frames = script.map(isThinking => toImage(sceneCells((cat = advance(cat, isThinking)), TRACK)))
 
-const control = Buffer.alloc(8)
-control.writeUInt32BE(frames.length, 0)
-const parts = [...header(width, height), chunk('acTL', control)]
-let sequence = 0
-frames.forEach((img, n) => {
-  const fc = Buffer.alloc(26)
-  fc.writeUInt32BE(sequence++, 0)
-  fc.writeUInt32BE(width, 4)
-  fc.writeUInt32BE(height, 8)
-  fc.writeUInt16BE(90, 20)
-  fc.writeUInt16BE(1000, 22)
-  parts.push(chunk('fcTL', fc))
-  const data = scanlines(img, width, height)
-  if (n === 0) parts.push(chunk('IDAT', data))
-  else {
-    const seq = Buffer.alloc(4)
-    seq.writeUInt32BE(sequence++, 0)
-    parts.push(chunk('fdAT', Buffer.concat([seq, data])))
-  }
-})
-parts.push(chunk('IEND', Buffer.alloc(0)))
-// An animated PNG first, then ffmpeg turns it into a GIF with an exact palette
-// and no dithering, so the pixel art stays crisp.
-const apng = join(mkdtempSync(join(tmpdir(), 'cat-spinner-')), 'preview.png')
-writeFileSync(apng, Buffer.concat(parts))
-execFileSync('ffmpeg', [
-  '-loglevel', 'error', '-y', '-i', apng,
-  '-vf', 'split[a][b];[a]palettegen=stats_mode=full[p];[b][p]paletteuse=dither=none',
-  '-loop', '0', 'assets/preview.gif',
-])
-console.log(`wrote assets/preview.gif (${frames.length} frames)`)
+mkdirSync('assets', { recursive: true })
+for (const coat of Object.keys(COATS) as Coat[]) {
+  useCoat(coat)
+  let cat: Cat = { run: 0, think: 0, sit: 0 }
+  const frames = script.map(isThinking => toImage(sceneCells((cat = advance(cat, isThinking)), TRACK)))
+
+  const control = Buffer.alloc(8)
+  control.writeUInt32BE(frames.length, 0)
+  const parts = [...header(width, height), chunk('acTL', control)]
+  let sequence = 0
+  frames.forEach((img, n) => {
+    const fc = Buffer.alloc(26)
+    fc.writeUInt32BE(sequence++, 0)
+    fc.writeUInt32BE(width, 4)
+    fc.writeUInt32BE(height, 8)
+    fc.writeUInt16BE(90, 20)
+    fc.writeUInt16BE(1000, 22)
+    parts.push(chunk('fcTL', fc))
+    const data = scanlines(img, width, height)
+    if (n === 0) parts.push(chunk('IDAT', data))
+    else {
+      const seq = Buffer.alloc(4)
+      seq.writeUInt32BE(sequence++, 0)
+      parts.push(chunk('fdAT', Buffer.concat([seq, data])))
+    }
+  })
+  parts.push(chunk('IEND', Buffer.alloc(0)))
+
+  // An animated PNG first, then ffmpeg turns it into a GIF with an exact
+  // palette and no dithering, so the pixel art stays crisp.
+  const apng = join(mkdtempSync(join(tmpdir(), 'cat-spinner-')), 'preview.png')
+  writeFileSync(apng, Buffer.concat(parts))
+  execFileSync('ffmpeg', [
+    '-loglevel', 'error', '-y', '-i', apng,
+    '-vf', 'split[a][b];[a]palettegen=stats_mode=full[p];[b][p]paletteuse=dither=none',
+    '-loop', '0', `assets/preview-${coat}.gif`,
+  ])
+  console.log(`wrote assets/preview-${coat}.gif (${frames.length} frames)`)
+}

@@ -13,9 +13,20 @@ const mix = (a: number, b: number, t: number) => a + (b - a) * t
 const mixV = (a: Vec, b: Vec, t: number) => v(mix(a.x, b.x, t), mix(a.y, b.y, t))
 const len = (a: Vec) => Math.hypot(a.x, a.y)
 
+// The coats share every shape and differ only in these colors. Roles: `mask`
+// tints the face, `muzzle` is the nose and mouth area, `point` and `pointLight`
+// color the ears, lower legs, and tail, and `paw` and `farPaw` the feet.
+const SHARED = {
+  shadow: 0x33333d,
+  cloud: 0xffffff,
+  cloudEdge: 0x9a9aa8,
+  text: 0x3a3a46,
+}
+
 // A seal-point colorpoint: taupe-grey body with soft mottling, cream chin and
 // chest, and dark seal-brown points on the ears, face mask, legs, and tail.
-export const COLORS = {
+const SIAMESE = {
+  ...SHARED,
   outline: 0x1c1512,
   inner: 0x4a3d35,
   coat: 0x9c8e82,
@@ -27,15 +38,50 @@ export const COLORS = {
   point: 0x4b3a31,
   farCoat: 0x6c5f56,
   farPoint: 0x382b24,
+  mask: 0x6a564a,
+  maskDark: 0x4b3a31,
+  muzzle: 0x4b3a31,
+  paw: 0x4b3a31,
+  farPaw: 0x382b24,
   eye: 0x86c1ee,
   pupil: 0x101418,
   nose: 0x1a1310,
   earInner: 0x5e4a40,
-  shadow: 0x33333d,
-  cloud: 0xffffff,
-  cloudEdge: 0x9a9aa8,
-  text: 0x3a3a46,
 }
+
+// An orange tabby: warm orange coat, cream muzzle, chest, and paws, darker
+// orange ears, legs, and tail, a pink nose, and green eyes.
+const ORANGE: typeof SIAMESE = {
+  ...SHARED,
+  outline: 0x3a2214,
+  inner: 0x8a4a1c,
+  coat: 0xf2a54a,
+  coatLight: 0xfbc77a,
+  coatShade: 0xd9862f,
+  cream: 0xfde6c4,
+  creamShade: 0xe9c79c,
+  pointLight: 0xe08f3a,
+  point: 0xc8742a,
+  farCoat: 0xb7682a,
+  farPoint: 0x93501c,
+  mask: 0xf2a54a,
+  maskDark: 0xd9862f,
+  muzzle: 0xfde6c4,
+  paw: 0xfde6c4,
+  farPaw: 0xcdab84,
+  eye: 0x9be05a,
+  pupil: 0x14100c,
+  nose: 0xff8fa8,
+  earInner: 0xf28aa0,
+}
+
+export const COATS = { siamese: SIAMESE, orange: ORANGE }
+export type Coat = keyof typeof COATS
+
+// The colors in use. The coat is a plugin setting, fixed for each load of the
+// module, so register() picks it once.
+export const COLORS = { ...SIAMESE }
+export const useCoat = (coat: Coat) => Object.assign(COLORS, COATS[coat])
 
 // A fixed per-pixel hash, for fur mottling that stays put on the body.
 const speckle = (x: number, y: number) => ((x * 73856093) ^ (y * 19349663)) >>> 0
@@ -344,10 +390,12 @@ const set = (canvas: Canvas, x: number, y: number, color: number) => {
 const legPaint = (isNear: boolean) => (shape: Shape) => {
   const t = 'a' in shape ? 1 : shape.t
   if (isNear) {
-    if (shape.kind === 'paw' || t > 0.6) return COLORS.point
+    if (shape.kind === 'paw') return COLORS.paw
+    if (t > 0.6) return COLORS.point
     return t > 0.3 ? COLORS.pointLight : COLORS.coatShade
   }
-  return shape.kind === 'paw' || t > 0.4 ? COLORS.farPoint : COLORS.farCoat
+  if (shape.kind === 'paw') return COLORS.farPaw
+  return t > 0.4 ? COLORS.farPoint : COLORS.farCoat
 }
 
 const bodyPaint = (pose: Pose) => (shape: Shape, down: number, x: number, y: number) => {
@@ -355,12 +403,12 @@ const bodyPaint = (pose: Pose) => (shape: Shape, down: number, x: number, y: num
     case 'earFar': return COLORS.farPoint
     case 'earNear': return COLORS.point
     case 'earInner': return COLORS.earInner
-    case 'muzzle': return COLORS.point
-    case 'cheek': return COLORS.pointLight
+    case 'muzzle': return COLORS.muzzle
+    case 'cheek': return COLORS.mask
     case 'head': {
       // The mask darkens toward the face; the back of the head stays coat-colored.
       const toFace = x + 0.5 - pose.head.x
-      if (toFace > 1.2) return COLORS.pointLight
+      if (toFace > 1.2) return COLORS.mask
       return down < -0.6 ? COLORS.coatLight : COLORS.coat
     }
     case 'neck': return down > -0.2 ? COLORS.cream : COLORS.coat
@@ -422,25 +470,23 @@ const sideFace = (canvas: Canvas, h: Vec, isClosed: boolean) => {
 
 // --- Facing out: the head, and the seated cat -----------------------------
 
-const own = (color: number): Own => () => color
-const shaded = (light: number, base: number, dark: number): Own => down => (down < -0.6 ? light : down > 0.6 ? dark : base)
 const ellipse = (x: number, y: number, rx: number, ry: number, z: number, paint: Own): Blob =>
   ({ x, y, rx, ry, t: 0, kind: 'front', z, own: paint })
 const tri = (a: Vec, b: Vec, c: Vec, z: number, paint: Own): Tri => ({ a, b, c, kind: 'front', z, own: paint })
 
 export const frontHead = (c: Vec): Shape[] => {
   const ear = (side: number): Shape[] => [
-    tri(add(c, v(3.9 * side, -1.4)), add(c, v(1.2 * side, -3.0)), add(c, v(3.5 * side, -5.4)), 2, own(COLORS.point)),
-    tri(add(c, v(3.3 * side, -2.0)), add(c, v(1.9 * side, -2.9)), add(c, v(3.2 * side, -4.4)), 2.5, own(COLORS.earInner)),
+    tri(add(c, v(3.9 * side, -1.4)), add(c, v(1.2 * side, -3.0)), add(c, v(3.5 * side, -5.4)), 2, () => COLORS.point),
+    tri(add(c, v(3.3 * side, -2.0)), add(c, v(1.9 * side, -2.9)), add(c, v(3.2 * side, -4.4)), 2.5, () => COLORS.earInner),
   ]
 
   return [
     ...ear(-1),
     ...ear(1),
-    ellipse(c.x, c.y, 4.0, 3.3, 3, shaded(COLORS.coatLight, COLORS.coat, COLORS.coat)),
-    ellipse(c.x, c.y + 1.1, 4.5, 2.2, 3, own(COLORS.coat)),
-    ellipse(c.x, c.y + 1.0, 2.7, 2.2, 4, own(COLORS.pointLight)),
-    ellipse(c.x, c.y + 1.9, 1.7, 1.1, 5, own(COLORS.point)),
+    ellipse(c.x, c.y, 4.0, 3.3, 3, down => (down < -0.6 ? COLORS.coatLight : COLORS.coat)),
+    ellipse(c.x, c.y + 1.1, 4.5, 2.2, 3, () => COLORS.coat),
+    ellipse(c.x, c.y + 1.0, 2.7, 2.2, 4, () => COLORS.mask),
+    ellipse(c.x, c.y + 1.9, 1.7, 1.1, 5, () => COLORS.muzzle),
   ]
 }
 
@@ -466,16 +512,17 @@ const frontFace = (canvas: Canvas, c: Vec, isClosed: boolean) => {
 
 // Hand-drawn: at this size a front-facing sit reads better pixel by pixel.
 // O outline, C coat, c light coat, d coat shade, Q cream, q cream shade,
-// p light point, P point, F far point, E eye, K pupil, N nose, I inner ear.
+// p light point, P point, F far point, E eye, K pupil, N nose, I inner ear,
+// m mask, M dark mask, U muzzle, Y paw, y far paw.
 export const SIT_ART = [
   '....O.........O........',
   '...OPO.......OPO.......',
   '...OPIOOOOOOOIPO.......',
-  '..OPCCcccpcccCCPO......',
-  '..OCEECppPppCEECO......',
-  '..OCEKCpPPPpCKECO......',
-  '..OCCCpPPNPPpCCCO......',
-  '...OCCCpPPPpCCCO.......',
+  '..OPCCcccmcccCCPO......',
+  '..OCEECmmMmmCEECO......',
+  '..OCEKCmMMMmCKECO......',
+  '..OCCCmUUNUUmCCCO......',
+  '...OCCCmUUUmCCCO.......',
   '....OOCQQQQQCOO........',
   '....OCQQQQQQQCO........',
   '...OCCQQQQQQQCCO...OO..',
@@ -484,15 +531,16 @@ export const SIT_ART = [
   '..OCCCOpPqPpOCCCOOPPO..',
   '.OCCCCOPPqPPOCCCOdPO...',
   '.OCCCdOPPOPPOdCOddO....',
-  'OddFFOPPPOPPPOFFOOO....',
+  'OddyyOYYYOYYYOyyOOO....',
   '.OOOOOOOOOOOOOOOOO.....',
 ]
 
-const SIT_COLORS: Record<string, number> = {
+const sitColors = (): Record<string, number> => ({
   O: COLORS.outline, C: COLORS.coat, c: COLORS.coatLight, d: COLORS.coatShade, Q: COLORS.cream,
   q: COLORS.creamShade, p: COLORS.pointLight, P: COLORS.point, F: COLORS.farPoint, E: COLORS.eye,
-  K: COLORS.pupil, N: COLORS.nose, I: COLORS.earInner,
-}
+  K: COLORS.pupil, N: COLORS.nose, I: COLORS.earInner, m: COLORS.mask, M: COLORS.maskDark,
+  U: COLORS.muzzle, Y: COLORS.paw, y: COLORS.farPaw,
+})
 const SIT_EYE_ROW = 4
 const SIT_TAIL_TIP = [10, 11]
 // The sprite column where the seated art starts, so the cat sits where it stood.
@@ -506,13 +554,14 @@ export const drawSitCat = (think: number, thought: Thought) => {
   const canvas: Canvas = { color: new Int32Array(W * H), owner: new Int8Array(W * H).fill(EMPTY) }
   const isClosed = think % 40 < 32
   const isFlicked = Math.floor(think / 6) % 4 === 3
+  const colors = sitColors()
 
   SIT_ART.forEach((line, row) => {
     const shifted = isFlicked && SIT_TAIL_TIP.includes(row) ? line.slice(0, 18) + '.' + line.slice(18, -1) : line
     ;[...shifted].forEach((ch, col) => {
       let key = ch
       if (isClosed && (ch === 'E' || ch === 'K')) key = row === SIT_EYE_ROW ? 'C' : 'O'
-      const color = SIT_COLORS[key]
+      const color = colors[key]
       if (color !== undefined) set(canvas, SIT_X + col, row, color)
     })
   })

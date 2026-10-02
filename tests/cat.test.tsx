@@ -78,19 +78,51 @@ describe('thinking', () => {
   })
 })
 
-test('draws the cat above the engine spinner line', async ($, on) => {
+const SPINNER = {
+  plugin: 'cat-spinner',
+  surface: 'terminal',
+  component: 'Spinner',
+  props: { word: 'Sauteing', message: null, suffix: '…', mode: 'responding' },
+} as const
+
+const engineSpinner: Parameters<typeof test>[1] = ($, on) => {
   on('ui.render', ($, e) => {
     const { Text } = $.ui.resolve(e)
 
     return <Text>Sauteing…</Text>
   })
-  const ui = await $.ui.mount({
-    plugin: 'cat-spinner',
-    surface: 'terminal',
-    component: 'Spinner',
-    props: { word: 'Sauteing', message: null, suffix: '…', mode: 'responding' },
-  })
+}
+
+// Every color the drawn Raster uses, foreground and background.
+const colorsOf = (cells: unknown) => {
+  const words = new Uint32Array(Uint8Array.from(atob(String(cells)), ch => ch.charCodeAt(0)).buffer)
+  return new Set(words.filter((_, i) => i % 3 !== 0))
+}
+
+test('draws the cat above the engine spinner line', async ($, on) => {
+  await engineSpinner($, on)
+  const ui = await $.ui.mount(SPINNER)
   expect(await ui.find({ type: 'Raster', key: 'cat' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /Sauteing/ })).toBeDefined()
   await ui.unmount()
+})
+
+describe('coats', () => {
+  test('is a Siamese by default', async ($, on) => {
+    await engineSpinner($, on)
+    const ui = await $.ui.mount(SPINNER)
+    const colors = colorsOf((await ui.find({ type: 'Raster', key: 'cat' }))?.props.cells)
+    expect(colors.has(0x9c8e82)).toBe(true) // taupe coat
+    expect(colors.has(0xf2a54a)).toBe(false)
+    await ui.unmount()
+  })
+
+  test('is an orange tabby with coat set to orange', { options: { coat: 'orange' } }, async ($, on) => {
+    await engineSpinner($, on)
+    const ui = await $.ui.mount(SPINNER)
+    const colors = colorsOf((await ui.find({ type: 'Raster', key: 'cat' }))?.props.cells)
+    expect(colors.has(0xf2a54a)).toBe(true) // orange coat
+    expect(colors.has(0x9c8e82)).toBe(false)
+    await ui.unmount()
+  })
 })

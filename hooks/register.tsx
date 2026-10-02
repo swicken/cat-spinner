@@ -1,6 +1,6 @@
 import type { Register } from 'claude-code'
 
-import { blend, drawCat, drawSitCat, H, standPose, walkPose, W, type Text, type Thought } from './rig'
+import { blend, COATS, drawCat, drawSitCat, H, standPose, useCoat, walkPose, W, type Coat, type Text, type Thought } from './rig'
 
 const FRAME_MS = 90
 const KEY = 'cat'
@@ -87,7 +87,9 @@ export const sceneCells = (cat: Cat, track: number) => {
   return btoa(binary)
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  const coat = String(options.coat ?? 'siamese')
+  useCoat(coat in COATS ? (coat as Coat) : 'siamese')
   let timer: { cancel: () => void } | undefined
   let isThinking = false
   let cat: Cat = { run: 0, think: 0, sit: 0 }
