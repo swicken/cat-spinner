@@ -11,22 +11,24 @@ import { startPlay } from '../hooks/yarn'
 const seeded = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32)
 
 // Walk two full tail cycles, then sit down to think long enough to blink.
-const walkAndSit = (coat: Coat) => {
+// For Halloween, the extras come along, the bats moving with the frame count.
+const walkAndSit = (coat: Coat, isHalloween = false) => {
   useCoat(coat)
   const track = W + 30
   const frames: string[] = []
   let cat: Cat = { run: 0, think: 0, sit: 0 }
-  for (let i = 0; i < 24; i++) frames.push(sceneCells((cat = advance(cat, false, track)), track))
-  for (let i = 0; i < 45; i++) frames.push(sceneCells((cat = advance(cat, true, track)), track))
+  const draw = () => sceneCells(cat, track, { isHalloween, time: frames.length })
+  for (let i = 0; i < 24; i++) (cat = advance(cat, false, track)), frames.push(draw())
+  for (let i = 0; i < 45; i++) (cat = advance(cat, true, track)), frames.push(draw())
   useCoat('siamese')
   return frames
 }
 
-const play = (isWild: boolean, frames: number) => {
+const play = (isWild: boolean, frames: number, isHalloween = false) => {
   const track = 90
   const rng = seeded(23)
   let cat: Cat = { run: 0, think: 0, sit: 0, play: startPlay(track, 0, true, isWild) }
-  return Array.from({ length: frames }, () => sceneCells((cat = advance(cat, false, track, rng)), track))
+  return Array.from({ length: frames }, (_, time) => sceneCells((cat = advance(cat, false, track, rng)), track, { isHalloween, time }))
 }
 
 // Claude's tools at work: typing, searching, digging, then a failed tool.
@@ -51,6 +53,8 @@ export const SCENES: Record<string, () => string[]> = {
   yarn: () => play(false, 240),
   pounce: () => play(true, 320),
   reactions,
+  'halloween: walk and sit': () => walkAndSit('black', true),
+  'halloween: yarn': () => play(false, 240, true),
 }
 
 // FNV-1a over every frame's cells: a short, stable fingerprint of the pixels.

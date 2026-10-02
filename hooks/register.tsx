@@ -5,6 +5,10 @@ import {
   ACT_FRAMES, activityOf, digPose, drawDirt, drawLaptop, drawMagnifier, isSeated, STARTLE_FRAMES, startlePose,
   startleText, type Act, type Activity,
 } from './react'
+import {
+  drawBats, drawFrontHat, drawPumpkin, drawSideHat, drawSitHat, HALLOWEEN_THOUGHTS, isHalloweenOn, PLAIN, SEASONS,
+  type Decor, type Season,
+} from './season'
 import { drawBall, playPose, rollBall, startPlay, stepPlay, type Play, type Rng } from './yarn'
 
 const FRAME_MS = 90
@@ -121,16 +125,18 @@ export const pickAnimation = (last: Playable | undefined, rng: Rng = Math.random
   return choices[Math.floor(rng() * choices.length)] ?? 'walk'
 }
 
-const thoughtOf = ({ sit, think }: Cat): Thought => {
+const thoughtOf = ({ sit, think }: Cat, decor: Decor): Thought => {
   if (sit < SIT_FRAMES) return undefined
   const puffs = Math.min(3, Math.floor(think / 4))
+  const thoughts = decor.isHalloween ? HALLOWEEN_THOUGHTS : THOUGHTS
 
-  return { puffs, text: THOUGHTS[Math.floor(think / 20) % THOUGHTS.length] ?? 'hmm' }
+  return { puffs, text: thoughts[Math.floor(think / 20) % thoughts.length] ?? 'hmm' }
 }
 
 // The whole track as Raster cells: [codePoint, foreground, background] per cell,
-// two pixels stacked in each cell as a half block.
-export const sceneCells = (cat: Cat, track: number) => {
+// two pixels stacked in each cell as a half block. `decor` adds the season's
+// extras; left out, the plain cat.
+export const sceneCells = (cat: Cat, track: number, decor: Decor = PLAIN) => {
   const { x, isFacingRight } = cat.play ?? position(cat.run, track)
   const isBlinking = cat.run % 50 >= 48
   const moving = walkPose(cat.run, isBlinking)
@@ -139,16 +145,24 @@ export const sceneCells = (cat: Cat, track: number) => {
     act?.kind === 'startle' ? startlePose(act.frame)
       : act?.kind === 'dig' && cat.sit === 0 ? digPose(act.frame)
         : cat.play ? playPose(cat.play, moving) : moving
+  const standing = blend(pose, standPose(), smooth(cat.sit / SETTLE_FRAMES))
+  const isLookingOut = cat.sit === SETTLE_FRAMES
   const drawn =
     cat.sit <= SETTLE_FRAMES
-      ? drawCat(blend(pose, standPose(), smooth(cat.sit / SETTLE_FRAMES)), cat.sit === SETTLE_FRAMES)
-      : drawSitCat(cat.think, isSeated(act) ? undefined : thoughtOf(cat), isSeated(act))
+      ? drawCat(standing, isLookingOut)
+      : drawSitCat(cat.think, isSeated(act) ? undefined : thoughtOf(cat, decor), isSeated(act))
   const { canvas } = drawn
   const texts = act?.kind === 'startle' ? [...drawn.texts, startleText(pose)] : drawn.texts
   // The tools' props, over the cat.
   if (act?.kind === 'dig' && cat.sit === 0) drawDirt(canvas, act.frame)
   if (cat.sit === SIT_FRAMES && act?.kind === 'type') drawLaptop(canvas, act.frame, COLORS.paw)
   if (cat.sit === SIT_FRAMES && act?.kind === 'search') drawMagnifier(canvas, act.frame, COLORS.paw, COLORS.eye, COLORS.pupil)
+  // The witch hat, on whichever way the head faces.
+  if (decor.isHalloween) {
+    if (cat.sit > SETTLE_FRAMES) drawSitHat(canvas)
+    else if (isLookingOut) drawFrontHat(canvas, standing.head)
+    else drawSideHat(canvas, standing.head)
+  }
 
   // The track's pixels: the cat at x, then the ball wherever the cat is not
   // (its shadow aside), so a swatting paw stays in front of the ball.
@@ -162,18 +176,16 @@ export const sceneCells = (cat: Cat, track: number) => {
       filled[py * track + x + px] = 1
     }
   }
-  if (cat.play) {
-    const inside = (px: number, py: number) => px >= 0 && px < track && py >= 0 && py < H
-    drawBall(
-      (px, py, color) => {
-        if (!inside(px, py)) return
-        pixels[py * track + px] = color
-        filled[py * track + px] = 1
-      },
-      (px, py) => inside(px, py) && (!filled[py * track + px] || pixels[py * track + px] === COLORS.shadow),
-      cat.play,
-    )
+  // The ball (or the season's pumpkin) and the bats go wherever the cat is not.
+  const inside = (px: number, py: number) => px >= 0 && px < track && py >= 0 && py < H
+  const paint = (px: number, py: number, color: number) => {
+    if (!inside(px, py)) return
+    pixels[py * track + px] = color
+    filled[py * track + px] = 1
   }
+  const isFree = (px: number, py: number) => inside(px, py) && (!filled[py * track + px] || pixels[py * track + px] === COLORS.shadow)
+  if (cat.play) (decor.isHalloween ? drawPumpkin : drawBall)(paint, isFree, cat.play)
+  if (decor.isHalloween) drawBats(paint, isFree, track, decor.time)
 
   const words = new Uint32Array(track * ROWS * 3)
   for (let i = 0; i < words.length; i += 3) words.set([0x20, DEFAULT_COLOR, DEFAULT_COLOR], i)
@@ -227,11 +239,18 @@ const WIDTH_LABELS: Record<Width, string> = {
   compact: 'Compact: up to 90 columns',
 }
 const ALIGN_LABELS: Record<Align, string> = { left: 'Left', center: 'Center', right: 'Right' }
+const SEASON_LABELS: Record<Season, string> = {
+  auto: 'Auto: Halloween through October',
+  halloween: 'Halloween',
+  plain: 'Plain: no seasonal extras',
+}
 
 // The dialog's live preview: its own cat, playing while the dialog is open.
 // A setting change reloads the module (and this state with it), so
 // session.start starts it again when the dialog is still open.
 let preview: { timer: { cancel: () => void }; cat: Cat; playing: Playable; frame: number; track: number } | undefined
+// Whether the Halloween extras are on, as this load of the module resolved it.
+let isHalloween = false
 
 function startPreview($: EngineInterface, animation: Animation, playing: Playable) {
   if (preview) return
@@ -241,14 +260,14 @@ function startPreview($: EngineInterface, animation: Animation, playing: Playabl
     state.frame += 1
     if (animation === 'random' && state.frame % 70 === 0) state.playing = pickAnimation(state.playing)
     state.cat = advance(inAnimation(state.cat, state.playing, state.track), false, state.track)
-    void $.ui.blit({ requestId: SETTINGS, key: PREVIEW_KEY, columns: state.track, rows: ROWS, cells: sceneCells(state.cat, state.track) })
+    void $.ui.blit({ requestId: SETTINGS, key: PREVIEW_KEY, columns: state.track, rows: ROWS, cells: sceneCells(state.cat, state.track, { isHalloween, time: state.frame }) })
   })
   preview = Object.assign(state, { timer })
 }
 
 // Which setting the dialog is showing the options of, or none for the list of
 // settings. A pick reloads the module, which puts the dialog back on the list.
-let editing: 'coat' | 'animation' | 'width' | 'align' | undefined
+let editing: 'coat' | 'animation' | 'width' | 'align' | 'season' | undefined
 
 function stopPreview() {
   preview?.timer.cancel()
@@ -260,6 +279,7 @@ const isCoat = (name: string): name is Coat => (COAT_NAMES as string[]).includes
 const isAnimation = (name: string): name is Animation => (ANIMATIONS as readonly string[]).includes(name)
 const isWidth = (name: string): name is Width => (WIDTHS as readonly string[]).includes(name)
 const isAlign = (name: string): name is Align => (ALIGNS as readonly string[]).includes(name)
+const isSeason = (name: string): name is Season => (SEASONS as readonly string[]).includes(name)
 
 export const register: Register = (on, options) => {
   const coatOption = String(options.coat ?? 'siamese')
@@ -270,6 +290,9 @@ export const register: Register = (on, options) => {
   const width: Width = isWidth(widthOption) ? widthOption : 'full'
   const alignOption = String(options.align ?? 'left')
   const align: Align = isAlign(alignOption) ? alignOption : 'left'
+  const seasonOption = String(options.season ?? 'auto')
+  const season: Season = isSeason(seasonOption) ? seasonOption : 'auto'
+  isHalloween = isHalloweenOn(season, new Date())
   useCoat(coat)
   let playing: Playable = animation === 'random' ? pickAnimation(undefined) : animation
 
@@ -315,6 +338,7 @@ export const register: Register = (on, options) => {
       { key: 'animation', label: 'Animation', current: animation as string, names: ANIMATIONS as readonly string[], labels: ANIMATION_LABELS as Record<string, string> },
       { key: 'width', label: 'Width', current: width as string, names: WIDTHS as readonly string[], labels: WIDTH_LABELS as Record<string, string> },
       { key: 'align', label: 'Alignment', current: align as string, names: ALIGNS as readonly string[], labels: ALIGN_LABELS as Record<string, string> },
+      { key: 'season', label: 'Season', current: season as string, names: SEASONS as readonly string[], labels: SEASON_LABELS as Record<string, string> },
     ] as const
     // Alignment only matters for a compact track, which is narrower than the terminal.
     const settings = every.filter(setting => setting.key !== 'align' || width === 'compact')
@@ -365,15 +389,16 @@ export const register: Register = (on, options) => {
     )
   })
 
-  // Switching writes the plugin's own "Cat", "Animation", "Width", or
-  // "Alignment" setting, the same ones /config shows, so the module reloads
-  // with the new choice.
+  // Switching writes the plugin's own "Cat", "Animation", "Width",
+  // "Alignment", or "Season" setting, the same ones /config shows, so the
+  // module reloads with the new choice.
   on('command.run', { command: 'cat-spinner' }, async ($, e) => {
     const choice = e.args.trim().toLowerCase()
     const list = (names: readonly string[]) => names.map(name => `/cat-spinner ${name}`).join(' or ')
-    const usage = `Switch cats with ${list(COAT_NAMES)}, animations with ${list(ANIMATIONS)}, the width with ${list(WIDTHS)}, and a compact track's alignment with ${list(ALIGNS)}.`
+    const usage = `Switch cats with ${list(COAT_NAMES)}, animations with ${list(ANIMATIONS)}, the width with ${list(WIDTHS)}, a compact track's alignment with ${list(ALIGNS)}, and the season with ${list(SEASONS)}.`
     const where = width === 'compact' ? `compact width, ${align}-aligned` : 'full width'
-    const now = `${animation === 'random' ? `random (${playing} right now)` : animation}, at ${where}`
+    const festive = season === 'auto' ? (isHalloween ? ', dressed for Halloween (auto)' : '') : season === 'halloween' ? ', dressed for Halloween' : ''
+    const now = `${animation === 'random' ? `random (${playing} right now)` : animation}, at ${where}${festive}`
     if (!choice) {
       // Where no dialog can open (a headless run, say), answer in text instead.
       const opened = await $.ui
@@ -409,12 +434,19 @@ export const register: Register = (on, options) => {
       return { text: width === 'compact' ? `Aligned ${choice}.` : `Aligned ${choice}; it shows once the width is compact (/cat-spinner compact).` }
     }
 
+    if (isSeason(choice)) {
+      if (choice === season) return { text: `The season is already ${season}.` }
+      const { deny } = await $.config.set({ key: 'cat-spinner.season', value: choice })
+      return { text: deny ? `Couldn't switch the season: ${deny}` : `Switched the season to ${choice}.` }
+    }
+
     return { text: `There's no "${choice}". ${usage}` }
   })
 
   let timer: { cancel: () => void } | undefined
   let isThinking = false
   let doing: Activity | undefined
+  let frame = 0
   let isStartled = false
 
   // Which tool is running sets the cat's activity; a failed or denied tool
@@ -437,7 +469,8 @@ export const register: Register = (on, options) => {
       if (!requestId || !track) return
       cat = advance(inAnimation(cat, playing, track), isThinking, track, Math.random, { doing, isStartled })
       isStartled = false
-      void $.ui.blit({ requestId, key: KEY, columns: track, rows: ROWS, cells: sceneCells(cat, track) })
+      frame += 1
+      void $.ui.blit({ requestId, key: KEY, columns: track, rows: ROWS, cells: sceneCells(cat, track, { isHalloween, time: frame }) })
     })
 
     return next(e)
@@ -462,7 +495,7 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="column">
         <Box key="track" marginLeft={trackOffset(e.viewport?.columns ?? 80, track, align)}>
-          <Raster key={KEY} columns={track} rows={ROWS} cells={sceneCells(cat, track)} />
+          <Raster key={KEY} columns={track} rows={ROWS} cells={sceneCells(cat, track, { isHalloween, time: frame })} />
         </Box>
         {await next(e)}
       </Box>

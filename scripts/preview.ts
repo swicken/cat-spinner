@@ -3,8 +3,9 @@
 // (assets/coats.png), and the yarn and pounce animations
 // (assets/preview-yarn.gif, assets/preview-pounce.gif), each with a sit to
 // think and a stand, and the reactions to Claude's tools, each labeled with
-// what Claude is doing (assets/preview-reactions.gif). Pounce uses a fixed
-// seed, so its GIF is repeatable. Needs ffmpeg
+// what Claude is doing (assets/preview-reactions.gif), and the Halloween
+// extras (assets/preview-halloween.gif). Pounce uses a fixed seed, so its GIF
+// is repeatable. Needs ffmpeg
 // on the PATH.
 //   npx tsx scripts/preview.ts
 import { execFileSync } from 'node:child_process'
@@ -232,4 +233,16 @@ gif('preview-pounce', scene({ run: 0, think: 0, sit: 0, play: startPlay(TRACK, 0
     }),
   )
   gif('preview-reactions', frames, LABEL_HEIGHT + height)
+}
+
+// Halloween: the black cat in its witch hat, batting a jack-o'-lantern, bats
+// overhead, then sitting to think "boo".
+{
+  useCoat('black')
+  const rng = seeded(23)
+  let cat: Cat = { run: 0, think: 0, sit: 0, play: startPlay(TRACK, 0, true, true) }
+  const script = [...Array(150).fill(false), ...Array(60).fill(true), ...Array(20).fill(false)] as boolean[]
+  const frames = script.map((isThinking, time) => toImage(sceneCells((cat = advance(cat, isThinking, TRACK, rng)), TRACK, { isHalloween: true, time })))
+  gif('preview-halloween', frames)
+  useCoat('siamese')
 }

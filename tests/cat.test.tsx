@@ -4,6 +4,7 @@ import { advance, inAnimation, pickAnimation, position, sceneCells, SIT_FRAMES, 
 import { ACT_FRAMES, activityOf, STARTLE_FRAMES } from '../hooks/react'
 import { COATS, CYCLE, pawAt, useCoat, W } from '../hooks/rig'
 import { BALL_R, startPlay } from '../hooks/yarn'
+import { isHalloweenOn } from '../hooks/season'
 import { GOLDEN } from './golden'
 import { fingerprint, SCENES } from './scenes'
 
@@ -112,7 +113,7 @@ test('draws the cat above the engine spinner line', async ($, on) => {
 })
 
 describe('coats', () => {
-  test('is a Siamese by default', async ($, on) => {
+  test('is a Siamese by default', { options: { season: 'plain' } }, async ($, on) => {
     await engineSpinner($, on)
     const ui = await $.ui.mount(SPINNER)
     const colors = colorsOf((await ui.find({ type: 'Raster', key: 'cat' }))?.props.cells)
@@ -122,7 +123,7 @@ describe('coats', () => {
   })
 
   for (const [name, palette] of Object.entries(COATS)) {
-    test(`draws the ${name} in its own coat color`, { options: { coat: name } }, async ($, on) => {
+    test(`draws the ${name} in its own coat color`, { options: { season: 'plain', coat: name } }, async ($, on) => {
       await engineSpinner($, on)
       const ui = await $.ui.mount(SPINNER)
       const colors = colorsOf((await ui.find({ type: 'Raster', key: 'cat' }))?.props.cells)
@@ -144,7 +145,7 @@ describe('coats', () => {
   })
 
   for (const name of ['calico', 'tortoiseshell'] as const) {
-    test(`breaks the ${name} coat into patches of both colors`, { options: { coat: name } }, async ($, on) => {
+    test(`breaks the ${name} coat into patches of both colors`, { options: { season: 'plain', coat: name } }, async ($, on) => {
       await engineSpinner($, on)
       const ui = await $.ui.mount(SPINNER)
       const colors = colorsOf((await ui.find({ type: 'Raster', key: 'cat' }))?.props.cells)
@@ -180,7 +181,7 @@ describe('coats', () => {
     }
   })
 
-  test('is an orange tabby with coat set to orange', { options: { coat: 'orange' } }, async ($, on) => {
+  test('is an orange tabby with coat set to orange', { options: { season: 'plain', coat: 'orange' } }, async ($, on) => {
     await engineSpinner($, on)
     const ui = await $.ui.mount(SPINNER)
     const colors = colorsOf((await ui.find({ type: 'Raster', key: 'cat' }))?.props.cells)
@@ -272,7 +273,7 @@ describe('the yarn animation', () => {
     })
   })
 
-  test('draws the ball from the first frame', { options: { animation: 'yarn' } }, async ($, on) => {
+  test('draws the ball from the first frame', { options: { season: 'plain', animation: 'yarn' } }, async ($, on) => {
     await engineSpinner($, on)
     const ui = await $.ui.mount(SPINNER)
     const colors = colorsOf((await ui.find({ type: 'Raster', key: 'cat' }))?.props.cells)
@@ -280,7 +281,7 @@ describe('the yarn animation', () => {
     await ui.unmount()
   })
 
-  test('has no ball in the walk animation', async ($, on) => {
+  test('has no ball in the walk animation', { options: { season: 'plain' } }, async ($, on) => {
     await engineSpinner($, on)
     const ui = await $.ui.mount(SPINNER)
     const colors = colorsOf((await ui.find({ type: 'Raster', key: 'cat' }))?.props.cells)
@@ -382,7 +383,7 @@ describe('random', () => {
     expect(position(back.run, track)).toEqual({ x, isFacingRight })
   })
 
-  test('switches with /cat-spinner random and says what it picked', { options: { animation: 'random' } }, async ($, on) => {
+  test('switches with /cat-spinner random and says what it picked', { options: { season: 'plain', animation: 'random' } }, async ($, on) => {
     const RUN = { command: 'cat-spinner', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } } as const
     const { text } = await $.command.run({ ...RUN, args: '' })
     expect(text).toMatch(/random \((walk|yarn|pounce) right now\)/)
@@ -398,7 +399,7 @@ describe('the settings dialog', () => {
     props: { title: 'cat-spinner', isFocused: true, bodyColumns: 70, placement: 'inline', scroll: { offset: 0, bodyRows: 14 }, view: {} },
   } as const
 
-  test('lists each setting with its current choice', { options: { coat: 'orange', animation: 'pounce' } }, async $ => {
+  test('lists each setting with its current choice', { options: { season: 'plain', coat: 'orange', animation: 'pounce' } }, async $ => {
     const ui = await $.ui.mount(DIALOG)
     expect(await ui.find({ type: 'Raster', key: 'preview' })).toBeDefined()
     expect((await ui.find({ type: 'Button', key: 'edit-coat' }))?.text).toContain('Cat: Orange tabby')
@@ -407,7 +408,7 @@ describe('the settings dialog', () => {
     await ui.unmount()
   })
 
-  test('opens a setting to its options, the current one checked', { options: { animation: 'yarn' } }, async $ => {
+  test('opens a setting to its options, the current one checked', { options: { season: 'plain', animation: 'yarn' } }, async $ => {
     const ui = await $.ui.mount(DIALOG)
     await ui.press({ key: 'edit-animation' })
     expect(await ui.find({ type: 'Button', key: 'edit-coat' })).toBeUndefined()
@@ -535,7 +536,7 @@ describe('width', () => {
     expect(trackOffset(200, 198, 'right')).toBe(0) // a full-width track has nothing spare
   })
 
-  test('draws a compact track centered when asked', { options: { width: 'compact', align: 'center' } }, async ($, on) => {
+  test('draws a compact track centered when asked', { options: { season: 'plain', width: 'compact', align: 'center' } }, async ($, on) => {
     await engineSpinner($, on)
     const ui = await $.ui.mount({ ...SPINNER, viewport: { columns: 160, rows: 40 } } as typeof SPINNER)
     expect((await ui.find({ type: 'Raster', key: 'cat' }))?.props.columns).toBe(90)
@@ -548,7 +549,7 @@ describe('width', () => {
     props: { title: 'cat-spinner', isFocused: true, bodyColumns: 70, placement: 'inline', scroll: { offset: 0, bodyRows: 14 }, view: {} },
   } as const
 
-  test('offers Alignment in the dialog once the track is compact', { options: { width: 'compact' } }, async $ => {
+  test('offers Alignment in the dialog once the track is compact', { options: { season: 'plain', width: 'compact' } }, async $ => {
     const ui = await $.ui.mount(DIALOG_PANE)
     expect((await ui.find({ type: 'Button', key: 'edit-align' }))?.text).toContain('Alignment: Left')
     await ui.unmount()
@@ -570,5 +571,59 @@ describe('width', () => {
     const ui = await $.ui.mount({ ...SPINNER, viewport: { columns: 160, rows: 40 } } as typeof SPINNER)
     expect((await ui.find({ type: 'Raster', key: 'cat' }))?.props.columns).toBe(158)
     await ui.unmount()
+  })
+})
+
+describe('Halloween', () => {
+  const DECOR = { isHalloween: true, time: 30 }
+
+  test('turns on through October when the season is auto', () => {
+    expect(isHalloweenOn('auto', new Date(2026, 9, 2))).toBe(true)
+    expect(isHalloweenOn('auto', new Date(2026, 9, 31))).toBe(true)
+    expect(isHalloweenOn('auto', new Date(2026, 10, 1))).toBe(false)
+    expect(isHalloweenOn('auto', new Date(2026, 8, 30))).toBe(false)
+    expect(isHalloweenOn('halloween', new Date(2026, 5, 1))).toBe(true)
+    expect(isHalloweenOn('plain', new Date(2026, 9, 31))).toBe(false)
+  })
+
+  const colors = (cat: Cat, track: number, decor = DECOR) =>
+    new Set(new Uint32Array(Uint8Array.from(atob(sceneCells(cat, track, decor)), ch => ch.charCodeAt(0)).buffer).filter((_, i) => i % 3 !== 0))
+
+  test('puts a witch hat on the cat walking and sitting', () => {
+    const HAT = 0x5b3480
+    expect(colors({ run: 3, think: 0, sit: 0 }, W + 10).has(HAT)).toBe(true)
+    let seated: Cat = { run: 3, think: 0, sit: 0 }
+    for (let i = 0; i < 10; i++) seated = advance(seated, true, W + 10)
+    expect(colors(seated, W + 10).has(HAT)).toBe(true)
+    expect(colors(seated, W + 10, { isHalloween: false, time: 0 }).has(HAT)).toBe(false)
+  })
+
+  test('swaps the ball of yarn for a jack-o\'-lantern', () => {
+    const cat: Cat = { run: 0, think: 0, sit: 0, play: startPlay(90) }
+    const pumpkin = colors(cat, 90)
+    expect(pumpkin.has(0xe8862c)).toBe(true) // the rind
+    expect(pumpkin.has(0xd94a5a)).toBe(false) // no yarn
+  })
+
+  test('sends bats across the track', () => {
+    expect(colors({ run: 0, think: 0, sit: 0 }, 120).has(0x7a5a9a)).toBe(true)
+  })
+
+  test('thinks "boo"', () => {
+    let seated: Cat = { run: 0, think: 0, sit: 0 }
+    for (let i = 0; i < SIT_FRAMES + 12; i++) seated = advance(seated, true, TRACK)
+    expect(rowText(sceneCells(seated, TRACK, DECOR), 1)).toMatch(/boo/)
+  })
+
+  test('switches with /cat-spinner plain by writing the Season setting', async ($, on) => {
+    const RUN = { command: 'cat-spinner', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } } as const
+    const writes: unknown[] = []
+    on('config.set', (_$, e) => {
+      writes.push({ key: e.key, value: e.value })
+      return { value: e.value }
+    })
+    const { text } = await $.command.run({ ...RUN, args: 'plain' })
+    expect(writes).toEqual([{ key: 'cat-spinner.season', value: 'plain' }])
+    expect(text).toBe('Switched the season to plain.')
   })
 })

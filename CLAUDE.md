@@ -8,6 +8,7 @@ A Claude Code mod (a plugin of function hooks) that draws a pixel-art cat above 
 - `hooks/rig.ts` is the cat itself: the coat palettes (`COATS`), the walking skeleton (`walkPose`, `standPose`, two-bone IK), the rasterizer with automatic outlines, and the hand-drawn seated cat (`SIT_ART`).
 - `hooks/yarn.ts` is the yarn and pounce play: ball physics, the chase rules, the swat, stalk, and leap poses, and drawing the ball.
 - `hooks/react.ts` is the reactions to Claude's tools: which tool means which activity (`activityOf`), the dig and startle poses, and the laptop, magnifying glass, and dirt drawn over the cat. The `tool.call` hook in `register.tsx` feeds it.
+- `hooks/season.ts` is the seasonal extras: the Season setting, when Halloween is on (`isHalloweenOn`, auto through October), the witch hat, the jack-o'-lantern, the bats, and the "boo" thought. Drawing takes a `Decor` explicitly; `PLAIN`, the default, draws the plain cat.
 - `tests/cat.test.tsx` holds the tests. `tests/scenes.ts` and `tests/golden.ts` are the golden scenes (below). `scripts/preview.ts` renders the README images in `assets/`.
 
 ## Checking a change
@@ -30,6 +31,10 @@ Tests can't show how anything looks in a terminal. For any visual change, render
 When a change is meant to alter the look, regenerate the file with `npx tsx scripts/fingerprints.ts > tests/golden.ts`, then check the diff: only the scenes you meant to change should have new fingerprints. Look at the new frames before accepting them. Never regenerate just to make a failing test pass. A changed fingerprint you didn't expect is a regression to investigate. (This caught a reaction getting stuck on its last frame.)
 
 When adding something visual, add a scene for it, so it's guarded from then on.
+
+## Tests and the calendar
+
+The Season setting defaults to Auto, which depends on today's date. Any test that mounts the mod and checks colors must pin the season (`options: { season: 'plain' }` or `'halloween'`), or it will pass in one month and fail in another. Golden scenes call `sceneCells` with an explicit `Decor`, so they never depend on the date.
 
 ## Engine rules that bite
 

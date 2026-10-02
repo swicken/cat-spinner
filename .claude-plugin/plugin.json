@@ -1,6 +1,6 @@
 {
   "name": "cat-spinner",
-  "version": "1.8.1",
+  "version": "1.9.0",
   "description": "A pixel-art cat walks back and forth above the spinner, or plays with a ball of yarn, and sits down facing you to think while Claude thinks",
   "author": {
     "name": "Scott Wicken",
@@ -54,6 +54,17 @@
         "left",
         "center",
         "right"
+      ]
+    },
+    "season": {
+      "type": "string",
+      "title": "Season",
+      "description": "Seasonal extras: auto (Halloween through October), halloween, or plain",
+      "default": "auto",
+      "options": [
+        "auto",
+        "halloween",
+        "plain"
       ]
     }
   }

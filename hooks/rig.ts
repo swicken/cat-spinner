@@ -5,7 +5,7 @@
 export const W = 40
 export const H = 18
 
-type Vec = { x: number; y: number }
+export type Vec = { x: number; y: number }
 const v = (x: number, y: number): Vec => ({ x, y })
 const add = (a: Vec, b: Vec) => v(a.x + b.x, a.y + b.y)
 const sub = (a: Vec, b: Vec) => v(a.x - b.x, a.y - b.y)

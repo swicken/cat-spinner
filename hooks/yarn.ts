@@ -8,7 +8,7 @@ import { blend, GROUND, H, smooth, standPose, W, type Pose } from './rig'
 
 // The ball: radius in pixels, its center height, and how it rolls.
 export const BALL_R = 2.4
-const BALL_Y = GROUND - 0.9
+export const BALL_Y = GROUND - 0.9
 const FRICTION = 0.92
 const STOP = 0.12
 const BOUNCE = 0.6
