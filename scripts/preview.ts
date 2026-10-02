@@ -2,7 +2,9 @@
 // Siamese (assets/preview-siamese.gif), every coat walking and sitting
 // (assets/coats.png), and the yarn and pounce animations
 // (assets/preview-yarn.gif, assets/preview-pounce.gif), each with a sit to
-// think and a stand. Pounce uses a fixed seed, so its GIF is repeatable. Needs ffmpeg
+// think and a stand, and the reactions to Claude's tools, each labeled with
+// what Claude is doing (assets/preview-reactions.gif). Pounce uses a fixed
+// seed, so its GIF is repeatable. Needs ffmpeg
 // on the PATH.
 //   npx tsx scripts/preview.ts
 import { execFileSync } from 'node:child_process'
@@ -11,7 +13,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { crc32, deflateSync } from 'node:zlib'
 
-import { advance, COAT_LABELS, sceneCells, type Cat } from '../hooks/register.tsx'
+import { advance, COAT_LABELS, sceneCells, type Cat, type Work } from '../hooks/register.tsx'
 import { COATS, H, useCoat, type Coat } from '../hooks/rig.ts'
 import { startPlay } from '../hooks/yarn.ts'
 
@@ -71,20 +73,20 @@ const scanlines = (img: Uint8Array, w: number, h: number) => {
   return deflateSync(raw)
 }
 
-const gif = (name: string, frames: Uint8Array[]) => {
+const gif = (name: string, frames: Uint8Array[], frameHeight = height) => {
   const control = Buffer.alloc(8)
   control.writeUInt32BE(frames.length, 0)
-  const parts = [...header(width, height), chunk('acTL', control)]
+  const parts = [...header(width, frameHeight), chunk('acTL', control)]
   let sequence = 0
   frames.forEach((img, n) => {
     const fc = Buffer.alloc(26)
     fc.writeUInt32BE(sequence++, 0)
     fc.writeUInt32BE(width, 4)
-    fc.writeUInt32BE(height, 8)
+    fc.writeUInt32BE(frameHeight, 8)
     fc.writeUInt16BE(90, 20)
     fc.writeUInt16BE(1000, 22)
     parts.push(chunk('fcTL', fc))
-    const data = scanlines(img, width, height)
+    const data = scanlines(img, width, frameHeight)
     if (n === 0) parts.push(chunk('IDAT', data))
     else {
       const seq = Buffer.alloc(4)
@@ -155,6 +157,24 @@ const LABEL_HEIGHT = 7 * LABEL_PIXEL + 10
 const LABEL_COLOR = [0xe6, 0xe6, 0xea]
 const BG_RGB = [(BG >> 16) & 255, (BG >> 8) & 255, BG & 255]
 
+// Fills a label band of an image `width` wide at row `top`, and writes `text` in it.
+const drawLabel = (img: Uint8Array, top: number, text: string) => {
+  for (let y = 0; y < LABEL_HEIGHT; y++) for (let x = 0; x < width; x++) img.set(BG_RGB, ((top + y) * width + x) * 3)
+  ;[...text.toUpperCase()].forEach((ch, k) => {
+    ;(FONT[ch] ?? FONT[' ']!).forEach((line, gy) => {
+      ;[...line].forEach((dot, gx) => {
+        if (dot !== '#') return
+        for (let py = 0; py < LABEL_PIXEL; py++) {
+          for (let px = 0; px < LABEL_PIXEL; px++) {
+            const x = 8 + (k * 6 + gx) * LABEL_PIXEL + px
+            if (x < width) img.set(LABEL_COLOR, ((top + 6 + gy * LABEL_PIXEL + py) * width + x) * 3)
+          }
+        }
+      })
+    })
+  })
+}
+
 // Every coat in one still, each under its name: a walk frame beside the
 // seated cat, eyes open.
 {
@@ -165,23 +185,8 @@ const BG_RGB = [(BG >> 16) & 255, (BG >> 8) & 255, BG & 255]
   const still = new Uint8Array(width * band * coats.length * 3)
   coats.forEach((coat, i) => {
     const top = i * band
-    for (let y = 0; y < LABEL_HEIGHT; y++) for (let x = 0; x < width; x++) still.set(BG_RGB, ((top + y) * width + x) * 3)
     // The name, up to any comma ("White, with odd eyes" is labelled "WHITE").
-    const name = (COAT_LABELS[coat].split(',')[0] ?? coat).toUpperCase()
-    ;[...name].forEach((ch, k) => {
-      ;(FONT[ch] ?? FONT[' ']!).forEach((line, gy) => {
-        ;[...line].forEach((dot, gx) => {
-          if (dot !== '#') return
-          for (let py = 0; py < LABEL_PIXEL; py++) {
-            for (let px = 0; px < LABEL_PIXEL; px++) {
-              const x = 8 + (k * 6 + gx) * LABEL_PIXEL + px
-              const y = top + 6 + gy * LABEL_PIXEL + py
-              if (x < width) still.set(LABEL_COLOR, (y * width + x) * 3)
-            }
-          }
-        })
-      })
-    })
+    drawLabel(still, top, COAT_LABELS[coat].split(',')[0] ?? coat)
     useCoat(coat)
     const walking = toImage(sceneCells({ run: 2, think: 0, sit: 0 }, TRACK))
     let seated: Cat = { run: 2, think: 0, sit: 0 }
@@ -200,3 +205,31 @@ useCoat('orange')
 gif('preview-yarn', scene({ run: 0, think: 0, sit: 0, play: startPlay(TRACK) }, 170, 50, 20))
 useCoat('siamese')
 gif('preview-pounce', scene({ run: 0, think: 0, sit: 0, play: startPlay(TRACK, 0, true, true) }, 260, 40, 20, seeded(23)))
+
+// What the cat does as Claude works, thinks, and uses its tools, each stretch
+// labeled with what Claude is doing.
+{
+  const stretches: [string, number, Work, boolean][] = [
+    ['Working', 24, {}, false],
+    ['Thinking', 45, {}, true],
+    ['Editing a file', 30, { doing: 'type' }, false],
+    ['Reading a file', 34, { doing: 'search' }, false],
+    ['Running a command', 30, { doing: 'dig' }, false],
+    ['A tool failed', 16, { isStartled: true }, false],
+    ['Working', 16, {}, false],
+  ]
+  useCoat('orange')
+  let cat: Cat = { run: 0, think: 0, sit: 0 }
+  const frames = stretches.flatMap(([label, count, work, isThinking]) =>
+    Array.from({ length: count }, (_, i) => {
+      // A failure is one moment; any other activity keeps running.
+      const now: Work = i === 0 || !work.isStartled ? work : {}
+      cat = advance(cat, isThinking, TRACK, Math.random, now)
+      const img = new Uint8Array(width * (LABEL_HEIGHT + height) * 3)
+      drawLabel(img, 0, label)
+      img.set(toImage(sceneCells(cat, TRACK)), width * LABEL_HEIGHT * 3)
+      return img
+    }),
+  )
+  gif('preview-reactions', frames, LABEL_HEIGHT + height)
+}

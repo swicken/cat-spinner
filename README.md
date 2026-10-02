@@ -1,8 +1,25 @@
 # cat-spinner
 
-A pixel-art cat for the Claude Code spinner. While Claude works, the cat walks back and forth above the spinner line. When Claude starts thinking, it stops, looks at you, and sits down facing you with a thought bubble until the thinking is done, then gets up and walks on.
+A pixel-art cat for the Claude Code spinner. It lives above the spinner line while Claude works, and what it does depends on what Claude is doing: it walks or plays while Claude works, sits down to think when Claude thinks, and reacts to Claude's tools by typing, reading, digging, or jumping in surprise.
 
 There are eight cats and four animations, and you can mix them freely.
+
+## What the cat does, and when
+
+| When Claude is | The cat |
+| --- | --- |
+| Working (no tool running) | Does your chosen animation: walks, or plays with a ball of yarn (see [Animations](#animations)). |
+| Thinking | Stops, looks at you, and sits down facing you with a thought bubble that cycles `hmm`, `...`, `?`, and `!`. It blinks slowly and flicks its tail tip, then gets up and carries on when the thinking ends. |
+| Editing or writing a file (Edit, Write, NotebookEdit) | Sits facing you and types on a little laptop, paws tapping over the lid. |
+| Reading or searching (Read, Grep, Glob, WebFetch, WebSearch) | Sits and sweeps a magnifying glass slowly from eye to eye; the eye under the lens looks big. |
+| Running a command (Bash) | Crouches and digs, front paws scrabbling, dirt flying back past its hind legs and a little mound growing in front. |
+| Hitting a tool that fails or is denied | Jumps in surprise, back arched, tail puffed straight up, with a `!` over its head. |
+| Using any other tool | Keeps doing its animation. |
+| Done | Goes away with the spinner, and picks up where it left off next time. |
+
+A failure interrupts anything, even sitting. Thinking comes before tool reactions. Each reaction lasts at least a second or so, so a quick read still shows.
+
+![Each reaction, labeled with what Claude is doing: working, thinking, editing a file, reading a file, running a command, and a tool failing](assets/preview-reactions.gif)
 
 ## Cats
 
@@ -10,13 +27,15 @@ There are eight cats and four animations, and you can mix them freely.
 
 **Siamese** is the default. **White** has odd eyes, one blue and one amber, which you see when it sits facing you. **Calico** and **Tortoiseshell** have patched coats: the patches are fixed to the cat's body, so they move with it as it walks.
 
-Here's the Siamese walking, sitting down to think, and walking on:
+Here's the Siamese walking, sitting down while Claude thinks, and walking on:
 
 ![The Siamese walking, sitting down to think, and walking on](assets/preview-siamese.gif)
 
 ## Animations
 
-**Walk** (the default): the cat walks back and forth, as above.
+These set what the cat does while Claude works without a tool running.
+
+**Walk** (the default): the cat walks back and forth.
 
 **Yarn:** the cat plays with a ball of yarn. It walks up to the ball, drops into a play-bow, and swats it with a front paw. The ball rolls away spinning, trailing a loose strand, and the cat chases it. Now and then it scoops the ball back under itself and has to turn around to follow it. When Claude thinks, the cat sits down facing you and the ball stays where it stopped.
 
@@ -27,17 +46,6 @@ Here's the Siamese walking, sitting down to think, and walking on:
 ![The Siamese stalking and pouncing on a ball of yarn](assets/preview-pounce.gif)
 
 **Random:** a different one of walk, yarn, and pounce each time Claude starts working. The cat carries on from wherever it is.
-
-## Reactions
-
-Whatever the animation, the cat reacts to what Claude is doing with its tools:
-
-- **Editing or writing files:** it sits facing you, typing on a little laptop.
-- **Running a command:** it digs, front paws scrabbling, dirt flying back past its hind legs.
-- **Reading or searching:** it sits and sweeps a magnifying glass across its face, its eye big under the lens.
-- **A tool fails or is denied:** it jumps in surprise, back arched, tail puffed straight up, with a `!` over its head.
-
-Each reaction lasts at least a second or so, so quick reads still show. Other tools leave the animation running.
 
 > **Still in progress.** This is an early version and changes are still coming, so expect the cat to keep evolving.
 
