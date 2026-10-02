@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { advance, inAnimation, pickAnimation, position, sceneCells, SIT_FRAMES, type Cat } from '../hooks/register'
-import { CYCLE, pawAt, W } from '../hooks/rig'
+import { COATS, CYCLE, pawAt, W } from '../hooks/rig'
 import { BALL_R, startPlay } from '../hooks/yarn'
 
 const TRACK = W + 10 // a 10-cell span to walk across
@@ -118,6 +118,35 @@ describe('coats', () => {
     await ui.unmount()
   })
 
+  for (const [name, palette] of Object.entries(COATS)) {
+    test(`draws the ${name} in its own coat color`, { options: { coat: name } }, async ($, on) => {
+      await engineSpinner($, on)
+      const ui = await $.ui.mount(SPINNER)
+      const colors = colorsOf((await ui.find({ type: 'Raster', key: 'cat' }))?.props.cells)
+      expect(colors.has(palette.coat)).toBe(true)
+      for (const [other, otherPalette] of Object.entries(COATS)) {
+        if (other !== name) expect(colors.has(otherPalette.coat)).toBe(false)
+      }
+      await ui.unmount()
+    })
+  }
+
+  // The yarn ball may draw over the ground shadow, so a coat color equal to
+  // the shadow's would let the ball draw over the cat.
+  test('uses no coat color equal to the ground shadow', () => {
+    for (const palette of Object.values(COATS)) {
+      const { shadow, ...cat } = palette
+      expect(Object.values(cat)).not.toContain(shadow)
+    }
+  })
+
+  test('gives the white cat odd eyes when it faces out', () => {
+    expect(COATS.white.eye).not.toBe(COATS.white.eyeOther)
+    for (const [name, palette] of Object.entries(COATS)) {
+      if (name !== 'white') expect(palette.eyeOther).toBe(palette.eye)
+    }
+  })
+
   test('is an orange tabby with coat set to orange', { options: { coat: 'orange' } }, async ($, on) => {
     await engineSpinner($, on)
     const ui = await $.ui.mount(SPINNER)
@@ -165,7 +194,7 @@ describe('the /cat-spinner command', () => {
       writes.push(e.key)
       return { value: e.value }
     })
-    const { text } = await $.command.run({ ...RUN, args: 'tuxedo' })
+    const { text } = await $.command.run({ ...RUN, args: 'dragon' })
     expect(writes).toEqual([])
     expect(text).toContain('/cat-spinner siamese or /cat-spinner orange')
     expect(text).toContain('/cat-spinner walk or /cat-spinner yarn')

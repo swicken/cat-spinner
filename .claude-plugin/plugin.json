@@ -1,7 +1,7 @@
 {
   "name": "cat-spinner",
-  "version": "1.4.0",
-  "description": "A pixel-art cat walks back and forth above the spinner, and sits down facing you to think while Claude thinks",
+  "version": "1.5.0",
+  "description": "A pixel-art cat walks back and forth above the spinner, or plays with a ball of yarn, and sits down facing you to think while Claude thinks",
   "author": {
     "name": "Scott Wicken",
     "url": "https://github.com/swicken"
@@ -14,7 +14,11 @@
       "default": "siamese",
       "options": [
         "siamese",
-        "orange"
+        "orange",
+        "tuxedo",
+        "black",
+        "russian-blue",
+        "white"
       ]
     },
     "animation": {

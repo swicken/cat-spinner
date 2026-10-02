@@ -153,7 +153,14 @@ export const sceneCells = (cat: Cat, track: number) => {
 const SETTINGS = 'cat-spinner-settings'
 const PREVIEW_KEY = 'preview'
 const PREVIEW_WIDTH = 60
-const COAT_LABELS: Record<Coat, string> = { siamese: 'Siamese', orange: 'Orange tabby' }
+const COAT_LABELS: Record<Coat, string> = {
+  siamese: 'Siamese',
+  orange: 'Orange tabby',
+  tuxedo: 'Tuxedo',
+  black: 'Black',
+  'russian-blue': 'Russian Blue',
+  white: 'White, with odd eyes',
+}
 const ANIMATION_LABELS: Record<Animation, string> = {
   walk: 'Walk: back and forth',
   yarn: 'Yarn: swats a ball of yarn',
@@ -298,7 +305,7 @@ export const register: Register = (on, options) => {
     if (!choice) {
       // Where no dialog can open (a headless run, say), answer in text instead.
       const opened = await $.ui
-        .open({ id: SETTINGS, title: 'cat-spinner', focus: true, closeOnEscape: true, holdToasts: true, rows: ROWS + 5 })
+        .open({ id: SETTINGS, title: 'cat-spinner', focus: true, closeOnEscape: true, holdToasts: true, rows: ROWS + 10 })
         .catch(() => undefined)
       if (opened?.isPlaced) {
         startPreview($, animation, playing)

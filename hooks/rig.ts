@@ -13,7 +13,8 @@ const mix = (a: number, b: number, t: number) => a + (b - a) * t
 const mixV = (a: Vec, b: Vec, t: number) => v(mix(a.x, b.x, t), mix(a.y, b.y, t))
 const len = (a: Vec) => Math.hypot(a.x, a.y)
 
-// The coats share every shape and differ only in these colors. Roles: `mask`
+// The coats share every shape and differ only in these colors. `eyeOther` is
+// the eye on the viewer's right when the cat faces out, for odd eyes. Roles: `mask`
 // tints the face, `muzzle` is the nose and mouth area, `point` and `pointLight`
 // color the ears, lower legs, and tail, and `paw` and `farPaw` the feet.
 const SHARED = {
@@ -44,6 +45,7 @@ const SIAMESE = {
   paw: 0x4b3a31,
   farPaw: 0x382b24,
   eye: 0x86c1ee,
+  eyeOther: 0x86c1ee,
   pupil: 0x101418,
   nose: 0x1a1310,
   earInner: 0x5e4a40,
@@ -70,12 +72,119 @@ const ORANGE: typeof SIAMESE = {
   paw: 0xfde6c4,
   farPaw: 0xcdab84,
   eye: 0x9be05a,
+  eyeOther: 0x9be05a,
   pupil: 0x14100c,
   nose: 0xff8fa8,
   earInner: 0xf28aa0,
 }
 
-export const COATS = { siamese: SIAMESE, orange: ORANGE }
+// A tuxedo: black with a white bib, muzzle, and paws, and green eyes. Black
+// coats get a grey outline so they stay visible on a dark terminal.
+const TUXEDO: typeof SIAMESE = {
+  ...SHARED,
+  outline: 0x4a4a56,
+  inner: 0x3c3c46,
+  coat: 0x23232b,
+  coatLight: 0x363640,
+  coatShade: 0x18181e,
+  cream: 0xf2f2f4,
+  creamShade: 0xd4d4da,
+  pointLight: 0x2b2b35,
+  point: 0x1d1d24,
+  farCoat: 0x17171c,
+  farPoint: 0x111115,
+  mask: 0x23232b,
+  maskDark: 0x2c2c35,
+  muzzle: 0xf2f2f4,
+  paw: 0xf2f2f4,
+  farPaw: 0xc4c4cc,
+  eye: 0x8fd36b,
+  eyeOther: 0x8fd36b,
+  pupil: 0x0a0a0c,
+  nose: 0xf29aa8,
+  earInner: 0x6b4a56,
+}
+
+// Solid black with amber eyes, and a little sheen on the coat so its shape
+// still reads on a dark terminal.
+const BLACK: typeof SIAMESE = {
+  ...SHARED,
+  outline: 0x55555f,
+  inner: 0x15151a,
+  coat: 0x2a2a33,
+  coatLight: 0x454552,
+  coatShade: 0x1d1d23,
+  cream: 0x35353f,
+  creamShade: 0x2a2a33,
+  pointLight: 0x2f2f38,
+  point: 0x24242b,
+  farCoat: 0x17171c,
+  farPoint: 0x121216,
+  mask: 0x2a2a33,
+  maskDark: 0x35353f,
+  muzzle: 0x363641,
+  paw: 0x24242b,
+  farPaw: 0x141418,
+  eye: 0xf2c230,
+  eyeOther: 0xf2c230,
+  pupil: 0x0a0a0a,
+  nose: 0x4a3c44,
+  earInner: 0x5a4650,
+}
+
+// A Russian Blue: soft blue-grey all over, a slate nose, and green eyes.
+const RUSSIAN_BLUE: typeof SIAMESE = {
+  ...SHARED,
+  outline: 0x262a33,
+  inner: 0x4c5462,
+  coat: 0x8a94a3,
+  coatLight: 0xa7b0bd,
+  coatShade: 0x717b8a,
+  cream: 0x9ca5b3,
+  creamShade: 0x8892a1,
+  pointLight: 0x7e8897,
+  point: 0x707a89,
+  farCoat: 0x5e6775,
+  farPoint: 0x525a67,
+  mask: 0x8a94a3,
+  maskDark: 0x7e8897,
+  muzzle: 0x9ca5b3,
+  paw: 0x7e8897,
+  farPaw: 0x5e6775,
+  eye: 0x6fd38a,
+  eyeOther: 0x6fd38a,
+  pupil: 0x0d1210,
+  nose: 0x596070,
+  earInner: 0x9a8ea4,
+}
+
+// White, with pink ears and nose, and odd eyes: one blue, one amber.
+const WHITE: typeof SIAMESE = {
+  ...SHARED,
+  outline: 0x5a5a66,
+  inner: 0xb4b4c0,
+  coat: 0xf2f2f5,
+  coatLight: 0xffffff,
+  coatShade: 0xd8d8e0,
+  cream: 0xffffff,
+  creamShade: 0xe5e5eb,
+  pointLight: 0xe5e5eb,
+  point: 0xd8d8e0,
+  farCoat: 0xc2c2cb,
+  farPoint: 0xb4b4bd,
+  mask: 0xf2f2f5,
+  maskDark: 0xe8e8ee,
+  muzzle: 0xffffff,
+  paw: 0xe9e9ef,
+  farPaw: 0xc2c2cb,
+  eye: 0x7fb8ee,
+  eyeOther: 0xe8b23a,
+  pupil: 0x101418,
+  nose: 0xf29aa8,
+  earInner: 0xf5a8b8,
+}
+
+export const COATS = { siamese: SIAMESE, orange: ORANGE, tuxedo: TUXEDO, black: BLACK, 'russian-blue': RUSSIAN_BLUE, white: WHITE }
 export type Coat = keyof typeof COATS
 
 // The colors in use. The coat is a plugin setting, fixed for each load of the
@@ -498,10 +607,11 @@ const frontFace = (canvas: Canvas, c: Vec, isClosed: boolean) => {
       set(canvas, x, y + 1, COLORS.outline)
       set(canvas, x + 1, y + 1, COLORS.outline)
     } else {
-      set(canvas, x, y, COLORS.eye)
-      set(canvas, x + 1, y, COLORS.eye)
+      const eye = side < 0 ? COLORS.eye : COLORS.eyeOther
+      set(canvas, x, y, eye)
+      set(canvas, x + 1, y, eye)
       set(canvas, side < 0 ? x + 1 : x, y + 1, COLORS.pupil)
-      set(canvas, side < 0 ? x : x + 1, y + 1, COLORS.eye)
+      set(canvas, side < 0 ? x : x + 1, y + 1, eye)
     }
   }
   set(canvas, c.x - 0.5, c.y + 1.4, COLORS.nose)
@@ -512,15 +622,15 @@ const frontFace = (canvas: Canvas, c: Vec, isClosed: boolean) => {
 
 // Hand-drawn: at this size a front-facing sit reads better pixel by pixel.
 // O outline, C coat, c light coat, d coat shade, Q cream, q cream shade,
-// p light point, P point, F far point, E eye, K pupil, N nose, I inner ear,
+// p light point, P point, F far point, E eye, e other eye, K pupil, N nose, I inner ear,
 // m mask, M dark mask, U muzzle, Y paw, y far paw.
 export const SIT_ART = [
   '....O.........O........',
   '...OPO.......OPO.......',
   '...OPIOOOOOOOIPO.......',
   '..OPCCcccmcccCCPO......',
-  '..OCEECmmMmmCEECO......',
-  '..OCEKCmMMMmCKECO......',
+  '..OCEECmmMmmCeeCO......',
+  '..OCEKCmMMMmCKeCO......',
   '..OCCCmUUNUUmCCCO......',
   '...OCCCmUUUmCCCO.......',
   '....OOCQQQQQCOO........',
@@ -537,7 +647,7 @@ export const SIT_ART = [
 
 const sitColors = (): Record<string, number> => ({
   O: COLORS.outline, C: COLORS.coat, c: COLORS.coatLight, d: COLORS.coatShade, Q: COLORS.cream,
-  q: COLORS.creamShade, p: COLORS.pointLight, P: COLORS.point, F: COLORS.farPoint, E: COLORS.eye,
+  q: COLORS.creamShade, p: COLORS.pointLight, P: COLORS.point, F: COLORS.farPoint, E: COLORS.eye, e: COLORS.eyeOther,
   K: COLORS.pupil, N: COLORS.nose, I: COLORS.earInner, m: COLORS.mask, M: COLORS.maskDark,
   U: COLORS.muzzle, Y: COLORS.paw, y: COLORS.farPaw,
 })
@@ -560,7 +670,7 @@ export const drawSitCat = (think: number, thought: Thought) => {
     const shifted = isFlicked && SIT_TAIL_TIP.includes(row) ? line.slice(0, 18) + '.' + line.slice(18, -1) : line
     ;[...shifted].forEach((ch, col) => {
       let key = ch
-      if (isClosed && (ch === 'E' || ch === 'K')) key = row === SIT_EYE_ROW ? 'C' : 'O'
+      if (isClosed && 'EeK'.includes(ch)) key = row === SIT_EYE_ROW ? 'C' : 'O'
       const color = colors[key]
       if (color !== undefined) set(canvas, SIT_X + col, row, color)
     })

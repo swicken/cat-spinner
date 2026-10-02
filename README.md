@@ -2,17 +2,17 @@
 
 A pixel-art cat for the Claude Code spinner. While Claude works, the cat walks back and forth above the spinner line. When Claude starts thinking, it stops, looks at you, and sits down facing you with a thought bubble until the thinking is done, then gets up and walks on.
 
-There are two cats and four animations, and you can mix them freely.
+There are six cats and four animations, and you can mix them freely.
 
 ## Cats
 
-**Siamese** (the default):
+![All six cats, walking and sitting](assets/coats.png)
+
+From the top: **Siamese** (the default, a seal-point colorpoint), **Orange tabby**, **Tuxedo**, **Black**, **Russian Blue**, and **White**, which has odd eyes: one blue and one amber, which you see when it sits facing you.
+
+Here's the Siamese walking, sitting down to think, and walking on:
 
 ![The Siamese walking, sitting down to think, and walking on](assets/preview-siamese.gif)
-
-**Orange tabby:**
-
-![The orange tabby walking, sitting down to think, and walking on](assets/preview-orange.gif)
 
 ## Animations
 
@@ -63,7 +63,7 @@ Run `/cat-spinner` to open its settings: a live preview of your cat above a list
 There are shortcuts too, if you know what you want:
 
 ```
-/cat-spinner orange      # or siamese
+/cat-spinner tuxedo      # or siamese, orange, black, russian-blue, white
 /cat-spinner pounce      # or walk, yarn, random
 ```
 

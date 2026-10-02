@@ -1,5 +1,6 @@
-// Renders the README animations from the mod's real cell output: the walk in
-// each coat (assets/preview-<coat>.gif) and the yarn and pounce animations
+// Renders the README images from the mod's real cell output: the walk for the
+// Siamese (assets/preview-siamese.gif), every coat walking and sitting
+// (assets/coats.png), and the yarn and pounce animations
 // (assets/preview-yarn.gif, assets/preview-pounce.gif), each with a sit to
 // think and a stand. Pounce uses a fixed seed, so its GIF is repeatable. Needs ffmpeg
 // on the PATH.
@@ -114,9 +115,31 @@ const scene = (start: Cat, working: number, thinking: number, after: number, rng
 }
 
 mkdirSync('assets', { recursive: true })
-for (const coat of Object.keys(COATS) as Coat[]) {
+for (const coat of ['siamese'] as const) {
   useCoat(coat)
   gif(`preview-${coat}`, scene({ run: 0, think: 0, sit: 0 }, 70, 55, 30))
+}
+
+// Every coat in one still: a walk frame beside the seated cat, eyes open.
+{
+  const SIT = 38 // frames into thinking: seated, mid slow-blink with eyes open
+  const coats = Object.keys(COATS) as Coat[]
+  const half = Math.floor(width / 2)
+  const still = new Uint8Array(width * height * coats.length * 3)
+  coats.forEach((coat, i) => {
+    useCoat(coat)
+    const walking = toImage(sceneCells({ run: 2, think: 0, sit: 0 }, TRACK))
+    let seated: Cat = { run: 2, think: 0, sit: 0 }
+    for (let f = 0; f < SIT; f++) seated = advance(seated, true, TRACK)
+    const sitting = toImage(sceneCells(seated, TRACK))
+    for (let y = 0; y < height; y++) {
+      const row = (i * height + y) * width * 3
+      still.set(walking.subarray(y * width * 3, (y * width + half) * 3), row)
+      still.set(sitting.subarray((y * width + 6) * 3, (y * width + 6 + width - half) * 3), row + half * 3)
+    }
+  })
+  writeFileSync('assets/coats.png', Buffer.concat([...header(width, height * coats.length), chunk('IDAT', scanlines(still, width, height * coats.length)), chunk('IEND', Buffer.alloc(0))]))
+  console.log(`wrote assets/coats.png (${coats.join(', ')})`)
 }
 useCoat('orange')
 gif('preview-yarn', scene({ run: 0, think: 0, sit: 0, play: startPlay(TRACK) }, 170, 50, 20))
