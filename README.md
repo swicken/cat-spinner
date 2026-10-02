@@ -38,6 +38,8 @@ claude plugin install cat-spinner@cat-spinner
 
 Then start a new Claude Code session. The cat appears the next time Claude is working on something.
 
+The install may say a userConfig option is not yet set. That's the choice of cat, and it's fine to leave: you get the Siamese, and you can switch any time (below). To start with the orange tabby instead, install with `claude plugin install cat-spinner@cat-spinner --config coat=orange`.
+
 ## Choosing your cat
 
 Switch cats with a command:
