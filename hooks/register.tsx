@@ -153,13 +153,15 @@ export const sceneCells = (cat: Cat, track: number) => {
 const SETTINGS = 'cat-spinner-settings'
 const PREVIEW_KEY = 'preview'
 const PREVIEW_WIDTH = 60
-const COAT_LABELS: Record<Coat, string> = {
+export const COAT_LABELS: Record<Coat, string> = {
   siamese: 'Siamese',
   orange: 'Orange tabby',
   tuxedo: 'Tuxedo',
   black: 'Black',
   'russian-blue': 'Russian Blue',
   white: 'White, with odd eyes',
+  calico: 'Calico',
+  tortoiseshell: 'Tortoiseshell',
 }
 const ANIMATION_LABELS: Record<Animation, string> = {
   walk: 'Walk: back and forth',

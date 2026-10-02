@@ -14,11 +14,19 @@ const mixV = (a: Vec, b: Vec, t: number) => v(mix(a.x, b.x, t), mix(a.y, b.y, t)
 const len = (a: Vec) => Math.hypot(a.x, a.y)
 
 // The coats share every shape and differ only in these colors. `eyeOther` is
-// the eye on the viewer's right when the cat faces out, for odd eyes, and
-// `bridge` the front of the face in profile, for the tuxedo's blaze. Roles: `mask`
+// the eye on the viewer's right when the cat faces out, for odd eyes, `bridge`
+// the front of the face in profile, for the tuxedo's blaze, and `legLight` and
+// `leg` the lower legs. Patched coats (calico, tortoiseshell) also set patch
+// colors and a scale, and their coat breaks into patches. Roles: `mask`
 // tints the face, `muzzle` is the nose and mouth area, `point` and `pointLight`
 // color the ears, lower legs, and tail, and `paw` and `farPaw` the feet.
 const SHARED = {
+  // Patches: none unless a coat sets a scale (see `patched`).
+  patchScale: 0,
+  patchLow: 0,
+  patchHigh: 1,
+  patchA: 0,
+  patchB: 0,
   shadow: 0x33333d,
   cloud: 0xffffff,
   cloudEdge: 0x9a9aa8,
@@ -38,6 +46,8 @@ const SIAMESE = {
   creamShade: 0xc2b6a5,
   pointLight: 0x6a564a,
   point: 0x4b3a31,
+  legLight: 0x6a564a,
+  leg: 0x4b3a31,
   farCoat: 0x6c5f56,
   farPoint: 0x382b24,
   mask: 0x6a564a,
@@ -66,6 +76,8 @@ const ORANGE: typeof SIAMESE = {
   creamShade: 0xe9c79c,
   pointLight: 0xe08f3a,
   point: 0xc8742a,
+  legLight: 0xe08f3a,
+  leg: 0xc8742a,
   farCoat: 0xb7682a,
   farPoint: 0x93501c,
   mask: 0xf2a54a,
@@ -94,6 +106,8 @@ const TUXEDO: typeof SIAMESE = {
   creamShade: 0xd4d4da,
   pointLight: 0x2b2b35,
   point: 0x1d1d24,
+  legLight: 0x2b2b35,
+  leg: 0x1d1d24,
   farCoat: 0x17171c,
   farPoint: 0x111115,
   mask: 0x23232b,
@@ -122,6 +136,8 @@ const BLACK: typeof SIAMESE = {
   creamShade: 0x2a2a33,
   pointLight: 0x2f2f38,
   point: 0x24242b,
+  legLight: 0x2f2f38,
+  leg: 0x24242b,
   farCoat: 0x17171c,
   farPoint: 0x121216,
   mask: 0x2a2a33,
@@ -149,6 +165,8 @@ const RUSSIAN_BLUE: typeof SIAMESE = {
   creamShade: 0x8892a1,
   pointLight: 0x7e8897,
   point: 0x707a89,
+  legLight: 0x7e8897,
+  leg: 0x707a89,
   farCoat: 0x5e6775,
   farPoint: 0x525a67,
   mask: 0x8a94a3,
@@ -176,6 +194,8 @@ const WHITE: typeof SIAMESE = {
   creamShade: 0xe5e5eb,
   pointLight: 0xe5e5eb,
   point: 0xd8d8e0,
+  legLight: 0xe5e5eb,
+  leg: 0xd8d8e0,
   farCoat: 0xc2c2cb,
   farPoint: 0xb4b4bd,
   mask: 0xf2f2f5,
@@ -191,7 +211,86 @@ const WHITE: typeof SIAMESE = {
   earInner: 0xf5a8b8,
 }
 
-export const COATS = { siamese: SIAMESE, orange: ORANGE, tuxedo: TUXEDO, black: BLACK, 'russian-blue': RUSSIAN_BLUE, white: WHITE }
+// A calico: white with large orange and black patches, white legs and chest,
+// black ears, and a tail running orange to a black tip.
+const CALICO: typeof SIAMESE = {
+  ...SHARED,
+  patchScale: 3.4,
+  patchLow: 0.37,
+  patchHigh: 0.58,
+  patchA: 0xe08a3c,
+  patchB: 0x2c2522,
+  outline: 0x3a2a22,
+  inner: 0xb3aa9f,
+  coat: 0xf4f0e8,
+  coatLight: 0xfffdf8,
+  coatShade: 0xdcd6cc,
+  cream: 0xfbf8f2,
+  creamShade: 0xe5e0d6,
+  pointLight: 0xe08a3c,
+  point: 0x2c2522,
+  legLight: 0xebe6dd,
+  leg: 0xe2dcd2,
+  farCoat: 0xc7c1b7,
+  farPoint: 0xbab4aa,
+  mask: 0xf4f0e8,
+  bridge: 0xf4f0e8,
+  maskDark: 0xf4f0e8,
+  muzzle: 0xfbf8f2,
+  paw: 0xfbf8f2,
+  farPaw: 0xcdc7bd,
+  eye: 0xc9cf48,
+  eyeOther: 0xc9cf48,
+  pupil: 0x14100c,
+  nose: 0xf29aa8,
+  earInner: 0x6e4f50,
+}
+
+// A tortoiseshell: dark brown-black finely mixed with orange and ginger, an
+// orange blaze, and copper eyes.
+const TORTOISESHELL: typeof SIAMESE = {
+  ...SHARED,
+  patchScale: 1.9,
+  patchLow: 0.4,
+  patchHigh: 0.72,
+  patchA: 0xd27b33,
+  patchB: 0x995829,
+  outline: 0x5a4f55,
+  inner: 0x1a1513,
+  coat: 0x2f2723,
+  coatLight: 0x433832,
+  coatShade: 0x241e1b,
+  cream: 0x3a2f2a,
+  creamShade: 0x2f2723,
+  pointLight: 0xc67430,
+  point: 0x201a17,
+  legLight: 0x2b2420,
+  leg: 0x231d1a,
+  farCoat: 0x1c1714,
+  farPoint: 0x161210,
+  mask: 0x2f2723,
+  bridge: 0xd27b33,
+  maskDark: 0xd27b33,
+  muzzle: 0x3a2f2a,
+  paw: 0x2b2420,
+  farPaw: 0x1c1714,
+  eye: 0xe3a53a,
+  eyeOther: 0xe3a53a,
+  pupil: 0x0c0a08,
+  nose: 0x6a4048,
+  earInner: 0x5a3e3c,
+}
+
+export const COATS = {
+  siamese: SIAMESE,
+  orange: ORANGE,
+  tuxedo: TUXEDO,
+  black: BLACK,
+  'russian-blue': RUSSIAN_BLUE,
+  white: WHITE,
+  calico: CALICO,
+  tortoiseshell: TORTOISESHELL,
+}
 export type Coat = keyof typeof COATS
 
 // The colors in use. The coat is a plugin setting, fixed for each load of the
@@ -201,6 +300,28 @@ export const useCoat = (coat: Coat) => Object.assign(COLORS, COATS[coat])
 
 // A fixed per-pixel hash, for fur mottling that stays put on the body.
 const speckle = (x: number, y: number) => ((x * 73856093) ^ (y * 19349663)) >>> 0
+
+// Smooth noise in 0..1: hashed values on a grid, blended between grid points.
+const noise = (x: number, y: number) => {
+  const i = Math.floor(x), j = Math.floor(y)
+  const at = (a: number, b: number) => (speckle(a + 1013, b + 7919) % 1024) / 1023
+  const ease = (t: number) => t * t * (3 - 2 * t)
+  const u = ease(x - i), w = ease(y - j)
+  const top = at(i, j) + (at(i + 1, j) - at(i, j)) * u
+  const bottom = at(i, j + 1) + (at(i + 1, j + 1) - at(i, j + 1)) * u
+  return top + (bottom - top) * w
+}
+
+// A coat pixel at (x, y), in body coordinates so the patches move with the
+// cat: patch A where the noise is low, patch B where it is high, else as is.
+// `top` (0 to 1) widens both bands toward the back, as on a calico, whose
+// patches sit on its back and head more than its belly.
+export const patched = (color: number, x: number, y: number, top = 0) => {
+  if (!COLORS.patchScale) return color
+  const n = noise(x / COLORS.patchScale, y / COLORS.patchScale)
+  const widen = 0.14 * Math.max(0, Math.min(1, top))
+  return n < COLORS.patchLow + widen ? COLORS.patchA : n > COLORS.patchHigh - widen ? COLORS.patchB : color
+}
 
 export type Paw = { at: Vec; lift: number }
 export type Pose = {
@@ -507,8 +628,8 @@ const legPaint = (isNear: boolean) => (shape: Shape) => {
   const t = 'a' in shape ? 1 : shape.t
   if (isNear) {
     if (shape.kind === 'paw') return COLORS.paw
-    if (t > 0.6) return COLORS.point
-    return t > 0.3 ? COLORS.pointLight : COLORS.coatShade
+    if (t > 0.6) return COLORS.leg
+    return t > 0.3 ? COLORS.legLight : COLORS.coatShade
   }
   if (shape.kind === 'paw') return COLORS.farPaw
   return t > 0.4 ? COLORS.farPoint : COLORS.farCoat
@@ -529,15 +650,16 @@ const bodyPaint = (pose: Pose) => (shape: Shape, down: number, x: number, y: num
       const belowBrow = y + 0.5 - pose.head.y
       if (toFace > 1.9 && belowBrow > -1.6 && belowBrow < 0.5) return COLORS.bridge
       if (toFace > 1.2) return COLORS.mask
-      return down < -0.6 ? COLORS.coatLight : COLORS.coat
+      return patched(down < -0.6 ? COLORS.coatLight : COLORS.coat, x - pose.hip.x, y - pose.hip.y, 1)
     }
     case 'neck': return down > -0.2 ? COLORS.cream : COLORS.coat
     default: {
       const t = 'a' in shape ? 0 : shape.t
       if (t > 0.72 && down > 0.1) return down > 0.85 ? COLORS.creamShade : COLORS.cream
-      if (down > 0.55) return COLORS.coatShade
-      if (down < -0.8) return COLORS.coatLight
-      return speckle(x, y) % 9 === 0 ? COLORS.coatLight : COLORS.coat
+      const body = (color: number) => patched(color, x - pose.hip.x, y - pose.hip.y, -down)
+      if (down > 0.55) return body(COLORS.coatShade)
+      if (down < -0.8) return body(COLORS.coatLight)
+      return body(speckle(x, y) % 9 === 0 ? COLORS.coatLight : COLORS.coat)
     }
   }
 }
@@ -634,7 +756,7 @@ const frontFace = (canvas: Canvas, c: Vec, isClosed: boolean) => {
 // Hand-drawn: at this size a front-facing sit reads better pixel by pixel.
 // O outline, C coat, c light coat, d coat shade, Q cream, q cream shade,
 // p light point, P point, F far point, E eye, e other eye, K pupil, N nose, I inner ear,
-// m mask, M dark mask, U muzzle, Y paw, y far paw.
+// m mask, M dark mask, U muzzle, Y paw, y far paw, l light leg, L leg.
 export const SIT_ART = [
   '....O.........O........',
   '...OPO.......OPO.......',
@@ -648,10 +770,10 @@ export const SIT_ART = [
   '....OCQQQQQQQCO........',
   '...OCCQQQQQQQCCO...OO..',
   '...OCCCQQQQQCCCO..OPPO.',
-  '..OCCCOppqppOCCCO.OPO..',
-  '..OCCCOpPqPpOCCCOOPPO..',
-  '.OCCCCOPPqPPOCCCOdPO...',
-  '.OCCCdOPPOPPOdCOddO....',
+  '..OCCCOllqllOCCCO.OPO..',
+  '..OCCCOlLqLlOCCCOOPPO..',
+  '.OCCCCOLLqLLOCCCOdPO...',
+  '.OCCCdOLLOLLOdCOddO....',
   'OddyyOYYYOYYYOyyOOO....',
   '.OOOOOOOOOOOOOOOOO.....',
 ]
@@ -660,12 +782,14 @@ const sitColors = (): Record<string, number> => ({
   O: COLORS.outline, C: COLORS.coat, c: COLORS.coatLight, d: COLORS.coatShade, Q: COLORS.cream,
   q: COLORS.creamShade, p: COLORS.pointLight, P: COLORS.point, F: COLORS.farPoint, E: COLORS.eye, e: COLORS.eyeOther,
   K: COLORS.pupil, N: COLORS.nose, I: COLORS.earInner, m: COLORS.mask, M: COLORS.maskDark,
-  U: COLORS.muzzle, Y: COLORS.paw, y: COLORS.farPaw,
+  U: COLORS.muzzle, Y: COLORS.paw, y: COLORS.farPaw, l: COLORS.legLight, L: COLORS.leg,
 })
 const SIT_EYE_ROW = 4
 const SIT_TAIL_TIP = [10, 11]
 // The sprite column where the seated art starts, so the cat sits where it stood.
 const SIT_X = 8
+// Where in the patch pattern the seated cat's coat comes from.
+const SIT_PATCHES = 40
 
 export type Thought = { puffs: number; text: string } | undefined
 export type Text = [number, number, string, number, number]
@@ -683,7 +807,9 @@ export const drawSitCat = (think: number, thought: Thought) => {
       let key = ch
       if (isClosed && 'EeK'.includes(ch)) key = row === SIT_EYE_ROW ? 'C' : 'O'
       const color = colors[key]
-      if (color !== undefined) set(canvas, SIT_X + col, row, color)
+      // Patches on the coat, from a different stretch of the pattern than the walk's.
+      const coat = 'Ccd'.includes(key) && color !== undefined ? patched(color, col + SIT_PATCHES, row) : color
+      if (coat !== undefined) set(canvas, SIT_X + col, row, coat)
     })
   })
   for (let x = SIT_X - 1; x <= SIT_X + 20; x++) {

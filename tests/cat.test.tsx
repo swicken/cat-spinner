@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { advance, inAnimation, pickAnimation, position, sceneCells, SIT_FRAMES, type Cat } from '../hooks/register'
-import { COATS, CYCLE, pawAt, W } from '../hooks/rig'
+import { COATS, CYCLE, pawAt, useCoat, W } from '../hooks/rig'
 import { BALL_R, startPlay } from '../hooks/yarn'
 
 const TRACK = W + 10 // a 10-cell span to walk across
@@ -138,6 +138,36 @@ describe('coats', () => {
       const { shadow, ...cat } = palette
       expect(Object.values(cat)).not.toContain(shadow)
     }
+  })
+
+  for (const name of ['calico', 'tortoiseshell'] as const) {
+    test(`breaks the ${name} coat into patches of both colors`, { options: { coat: name } }, async ($, on) => {
+      await engineSpinner($, on)
+      const ui = await $.ui.mount(SPINNER)
+      const colors = colorsOf((await ui.find({ type: 'Raster', key: 'cat' }))?.props.cells)
+      expect(colors.has(COATS[name].patchA)).toBe(true)
+      expect(colors.has(COATS[name].patchB)).toBe(true)
+      await ui.unmount()
+    })
+  }
+
+  // Two step cycles later (the tail's sway takes two) the cat has moved 24
+  // cells and is in the same pose, so with the patches riding on the body it
+  // is drawn exactly the same.
+  test('keeps the patches fixed to the body as the cat walks', () => {
+    useCoat('calico')
+    const track = W + 30
+    const words = (run: number) => new Uint32Array(Uint8Array.from(atob(sceneCells({ run, think: 0, sit: 0 }, track)), ch => ch.charCodeAt(0)).buffer)
+    const later = 2 * CYCLE
+    const [before, after] = [words(0), words(later)]
+    for (let row = 0; row < 9; row++) {
+      for (let col = 0; col < W; col++) {
+        for (let k = 0; k < 3; k++) {
+          expect(after[(row * track + col + later) * 3 + k]).toBe(before[(row * track + col) * 3 + k])
+        }
+      }
+    }
+    useCoat('siamese')
   })
 
   test('gives the white cat odd eyes when it faces out', () => {

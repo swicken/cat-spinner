@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { crc32, deflateSync } from 'node:zlib'
 
-import { advance, sceneCells, type Cat } from '../hooks/register.tsx'
+import { advance, COAT_LABELS, sceneCells, type Cat } from '../hooks/register.tsx'
 import { COATS, H, useCoat, type Coat } from '../hooks/rig.ts'
 import { startPlay } from '../hooks/yarn.ts'
 
@@ -120,25 +120,80 @@ for (const coat of ['siamese'] as const) {
   gif(`preview-${coat}`, scene({ run: 0, think: 0, sit: 0 }, 70, 55, 30))
 }
 
-// Every coat in one still: a walk frame beside the seated cat, eyes open.
+// A 5x7 pixel font for the labels, capitals only.
+const FONT: Record<string, string[]> = {
+  A: ['.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+  B: ['####.', '#...#', '#...#', '####.', '#...#', '#...#', '####.'],
+  C: ['.###.', '#...#', '#....', '#....', '#....', '#...#', '.###.'],
+  D: ['####.', '#...#', '#...#', '#...#', '#...#', '#...#', '####.'],
+  E: ['#####', '#....', '#....', '####.', '#....', '#....', '#####'],
+  F: ['#####', '#....', '#....', '####.', '#....', '#....', '#....'],
+  G: ['.###.', '#...#', '#....', '#.###', '#...#', '#...#', '.###.'],
+  H: ['#...#', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+  I: ['.###.', '..#..', '..#..', '..#..', '..#..', '..#..', '.###.'],
+  J: ['..###', '...#.', '...#.', '...#.', '...#.', '#..#.', '.##..'],
+  K: ['#...#', '#..#.', '#.#..', '##...', '#.#..', '#..#.', '#...#'],
+  L: ['#....', '#....', '#....', '#....', '#....', '#....', '#####'],
+  M: ['#...#', '##.##', '#.#.#', '#.#.#', '#...#', '#...#', '#...#'],
+  N: ['#...#', '##..#', '#.#.#', '#..##', '#...#', '#...#', '#...#'],
+  O: ['.###.', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+  P: ['####.', '#...#', '#...#', '####.', '#....', '#....', '#....'],
+  Q: ['.###.', '#...#', '#...#', '#...#', '#.#.#', '#..#.', '.##.#'],
+  R: ['####.', '#...#', '#...#', '####.', '#.#..', '#..#.', '#...#'],
+  S: ['.####', '#....', '#....', '.###.', '....#', '....#', '####.'],
+  T: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..'],
+  U: ['#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+  V: ['#...#', '#...#', '#...#', '#...#', '#...#', '.#.#.', '..#..'],
+  W: ['#...#', '#...#', '#...#', '#.#.#', '#.#.#', '##.##', '#...#'],
+  X: ['#...#', '#...#', '.#.#.', '..#..', '.#.#.', '#...#', '#...#'],
+  Y: ['#...#', '#...#', '.#.#.', '..#..', '..#..', '..#..', '..#..'],
+  Z: ['#####', '....#', '...#.', '..#..', '.#...', '#....', '#####'],
+  ' ': ['.....', '.....', '.....', '.....', '.....', '.....', '.....'],
+}
+const LABEL_PIXEL = 2
+const LABEL_HEIGHT = 7 * LABEL_PIXEL + 10
+const LABEL_COLOR = [0xe6, 0xe6, 0xea]
+const BG_RGB = [(BG >> 16) & 255, (BG >> 8) & 255, BG & 255]
+
+// Every coat in one still, each under its name: a walk frame beside the
+// seated cat, eyes open.
 {
   const SIT = 38 // frames into thinking: seated, mid slow-blink with eyes open
   const coats = Object.keys(COATS) as Coat[]
   const half = Math.floor(width / 2)
-  const still = new Uint8Array(width * height * coats.length * 3)
+  const band = LABEL_HEIGHT + height
+  const still = new Uint8Array(width * band * coats.length * 3)
   coats.forEach((coat, i) => {
+    const top = i * band
+    for (let y = 0; y < LABEL_HEIGHT; y++) for (let x = 0; x < width; x++) still.set(BG_RGB, ((top + y) * width + x) * 3)
+    // The name, up to any comma ("White, with odd eyes" is labelled "WHITE").
+    const name = (COAT_LABELS[coat].split(',')[0] ?? coat).toUpperCase()
+    ;[...name].forEach((ch, k) => {
+      ;(FONT[ch] ?? FONT[' ']!).forEach((line, gy) => {
+        ;[...line].forEach((dot, gx) => {
+          if (dot !== '#') return
+          for (let py = 0; py < LABEL_PIXEL; py++) {
+            for (let px = 0; px < LABEL_PIXEL; px++) {
+              const x = 8 + (k * 6 + gx) * LABEL_PIXEL + px
+              const y = top + 6 + gy * LABEL_PIXEL + py
+              if (x < width) still.set(LABEL_COLOR, (y * width + x) * 3)
+            }
+          }
+        })
+      })
+    })
     useCoat(coat)
     const walking = toImage(sceneCells({ run: 2, think: 0, sit: 0 }, TRACK))
     let seated: Cat = { run: 2, think: 0, sit: 0 }
     for (let f = 0; f < SIT; f++) seated = advance(seated, true, TRACK)
     const sitting = toImage(sceneCells(seated, TRACK))
     for (let y = 0; y < height; y++) {
-      const row = (i * height + y) * width * 3
+      const row = (top + LABEL_HEIGHT + y) * width * 3
       still.set(walking.subarray(y * width * 3, (y * width + half) * 3), row)
       still.set(sitting.subarray((y * width + 6) * 3, (y * width + 6 + width - half) * 3), row + half * 3)
     }
   })
-  writeFileSync('assets/coats.png', Buffer.concat([...header(width, height * coats.length), chunk('IDAT', scanlines(still, width, height * coats.length)), chunk('IEND', Buffer.alloc(0))]))
+  writeFileSync('assets/coats.png', Buffer.concat([...header(width, band * coats.length), chunk('IDAT', scanlines(still, width, band * coats.length)), chunk('IEND', Buffer.alloc(0))]))
   console.log(`wrote assets/coats.png (${coats.join(', ')})`)
 }
 useCoat('orange')
