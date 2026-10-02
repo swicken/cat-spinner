@@ -58,7 +58,7 @@ The install may say userConfig options are not yet set. Those are the choices of
 
 ## Choosing your cat and animation
 
-Run `/cat-spinner` to open its settings: a live preview of your cat, a **Cat** picker, and an **Animation** picker. Changes save as you pick them, and the preview updates to match. Press Esc or **Done** to close.
+Run `/cat-spinner` to open its settings: a live preview of your cat above a list of settings, **Cat** and **Animation**, each showing its current choice. Move with the arrow keys and press Enter on a setting to see its options, then Enter again to pick one. Changes save as you pick them, and the preview updates to match. In a setting's options Esc goes back to the list; in the list, Esc or **Done** closes.
 
 There are shortcuts too, if you know what you want:
 

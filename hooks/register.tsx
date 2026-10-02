@@ -179,6 +179,10 @@ function startPreview($: EngineInterface, animation: Animation, playing: Playabl
   preview = Object.assign(state, { timer })
 }
 
+// Which setting the dialog is showing the options of, or none for the list of
+// settings. A pick reloads the module, which puts the dialog back on the list.
+let editing: 'coat' | 'animation' | undefined
+
 function stopPreview() {
   preview?.timer.cancel()
   preview = undefined
@@ -206,7 +210,14 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+  // Esc in a setting's options goes back to the list instead of closing.
   on('ui.close', { id: SETTINGS }, ($, e, next) => {
+    if (e.origin.kind === 'person' && editing) {
+      editing = undefined
+      $.ui.invalidate('ui.render')
+      return { deny: 'back to the list of settings' }
+    }
+    editing = undefined
     stopPreview()
 
     return next(e)
@@ -218,35 +229,61 @@ export const register: Register = (on, options) => {
       const { Text } = $.ui.resolve(e)
       return <Text>Switch with /cat-spinner siamese, orange, walk, yarn, pounce, or random.</Text>
     }
-    const { Box, Button, Raster, Select, Text } = $.ui.resolve(e)
+    const { Box, Button, Raster, Text } = $.ui.resolve(e)
     const track = Math.max(W + 4, Math.min(PREVIEW_WIDTH, e.props.bodyColumns))
     if (preview) preview.track = track
-    const choose = (key: 'coat' | 'animation', current: string) => (value: string) => {
-      if (value !== current) void $.config.set({ key: `cat-spinner.${key}`, value })
+    const show = (next: typeof editing, focus: string) => {
+      editing = next
+      $.ui.invalidate('ui.render')
+      $.clock.after(50, () => void $.ui.focus({ requestId: SETTINGS, key: focus }))
     }
+    const settings = [
+      { key: 'coat', label: 'Cat', current: coat as string, names: COAT_NAMES as readonly string[], labels: COAT_LABELS as Record<string, string> },
+      { key: 'animation', label: 'Animation', current: animation as string, names: ANIMATIONS as readonly string[], labels: ANIMATION_LABELS as Record<string, string> },
+    ] as const
+    const open = settings.find(setting => setting.key === editing)
+
+    // The list of settings, each showing its current choice; or the options
+    // of the one being changed, the current one checked.
+    const body = open ? (
+      <Box flexDirection="column">
+        <Text bold>{open.label}</Text>
+        {open.names.map((name, i) => (
+          <Button
+            key={`${open.key}-${name}`}
+            label={`${name === open.current ? '✓' : ' '} ${open.labels[name] ?? name}`}
+            autoFocus={name === open.current || (i === 0 && !open.names.includes(open.current)) ? true : undefined}
+            onPress={() => {
+              if (name === open.current) return show(undefined, `edit-${open.key}`)
+              void $.config.set({ key: `cat-spinner.${open.key}`, value: name }).then(({ deny }) => {
+                if (deny) show(undefined, `edit-${open.key}`)
+              })
+            }}
+          />
+        ))}
+        <Text dimColor>Enter picks. Esc goes back.</Text>
+      </Box>
+    ) : (
+      <Box flexDirection="column">
+        {settings.map((setting, i) => (
+          <Button
+            key={`edit-${setting.key}`}
+            label={`${setting.label}: ${setting.labels[setting.current] ?? setting.current}`}
+            autoFocus={i === 0 ? true : undefined}
+            onPress={() => show(setting.key, `${setting.key}-${setting.current}`)}
+          />
+        ))}
+        <Box>
+          <Button key="done" label="Done" role="dismiss" onPress={() => void $.ui.close({ id: SETTINGS })} />
+          <Text dimColor> Enter changes a setting. Esc closes.</Text>
+        </Box>
+      </Box>
+    )
 
     return (
       <Box flexDirection="column">
         <Raster key={PREVIEW_KEY} columns={track} rows={ROWS} cells={sceneCells(preview?.cat ?? { run: 0, think: 0, sit: 0 }, track)} />
-        <Select
-          key="coat"
-          label="Cat: "
-          autoFocus
-          value={coat}
-          options={COAT_NAMES.map(value => ({ value, label: COAT_LABELS[value] }))}
-          onSelect={choose('coat', coat)}
-        />
-        <Select
-          key="animation"
-          label="Animation: "
-          value={animation}
-          options={ANIMATIONS.map(value => ({ value, label: ANIMATION_LABELS[value] }))}
-          onSelect={choose('animation', animation)}
-        />
-        <Box>
-          <Button key="done" label="Done" role="dismiss" onPress={() => void $.ui.close({ id: SETTINGS })} />
-          <Text dimColor> Changes save as you pick them. Esc closes.</Text>
-        </Box>
+        {body}
       </Box>
     )
   })

@@ -336,29 +336,37 @@ describe('the settings dialog', () => {
     props: { title: 'cat-spinner', isFocused: true, bodyColumns: 70, placement: 'inline', scroll: { offset: 0, bodyRows: 14 }, view: {} },
   } as const
 
-  test('shows a preview and both pickers, set to the current choices', { options: { coat: 'orange', animation: 'pounce' } }, async $ => {
+  test('lists each setting with its current choice', { options: { coat: 'orange', animation: 'pounce' } }, async $ => {
     const ui = await $.ui.mount(DIALOG)
     expect(await ui.find({ type: 'Raster', key: 'preview' })).toBeDefined()
-    expect((await ui.find({ type: 'Select', key: 'coat' }))?.props.value).toBe('orange')
-    expect((await ui.find({ type: 'Select', key: 'animation' }))?.props.value).toBe('pounce')
-    expect(await ui.find({ type: 'Button', key: 'done' })).toBeDefined()
+    expect((await ui.find({ type: 'Button', key: 'edit-coat' }))?.text).toContain('Cat: Orange tabby')
+    expect((await ui.find({ type: 'Button', key: 'edit-animation' }))?.text).toContain('Animation: Pounce')
+    expect(await ui.find({ type: 'Button', key: 'coat-siamese' })).toBeUndefined()
     await ui.unmount()
   })
 
-  test('saves a pick to its setting, and nothing for the current choice', async ($, on) => {
+  test('opens a setting to its options, the current one checked', { options: { animation: 'yarn' } }, async $ => {
+    const ui = await $.ui.mount(DIALOG)
+    await ui.press({ key: 'edit-animation' })
+    expect(await ui.find({ type: 'Button', key: 'edit-coat' })).toBeUndefined()
+    expect((await ui.find({ type: 'Button', key: 'animation-yarn' }))?.text).toContain('✓')
+    expect((await ui.find({ type: 'Button', key: 'animation-pounce' }))?.text).not.toContain('✓')
+    await ui.unmount()
+  })
+
+  test('saves an option when picked, and goes back on the current one', async ($, on) => {
     const writes: unknown[] = []
     on('config.set', (_$, e) => {
       writes.push({ key: e.key, value: e.value })
       return { value: e.value }
     })
     const ui = await $.ui.mount(DIALOG)
-    await ui.select({ key: 'animation', value: 'yarn' })
-    await ui.select({ key: 'coat', value: 'siamese' })
-    await ui.select({ key: 'coat', value: 'orange' })
-    expect(writes).toEqual([
-      { key: 'cat-spinner.animation', value: 'yarn' },
-      { key: 'cat-spinner.coat', value: 'orange' },
-    ])
+    await ui.press({ key: 'edit-animation' })
+    await ui.press({ key: 'animation-walk' }) // already the animation: back to the list
+    expect(await ui.find({ type: 'Button', key: 'edit-animation' })).toBeDefined()
+    await ui.press({ key: 'edit-animation' })
+    await ui.press({ key: 'animation-pounce' })
+    expect(writes).toEqual([{ key: 'cat-spinner.animation', value: 'pounce' }])
     await ui.unmount()
   })
 })
