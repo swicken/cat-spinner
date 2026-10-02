@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "cat-spinner",
+  "description": "A pixel-art cat for the Claude Code spinner.",
+  "owner": {
+    "name": "Scott Wicken",
+    "url": "https://github.com/swicken"
+  },
+  "plugins": [
+    {
+      "name": "cat-spinner",
+      "description": "A pixel-art Siamese walks above the spinner and sits down to think while Claude thinks.",
+      "source": "./",
+      "category": "fun"
+    }
+  ]
+}

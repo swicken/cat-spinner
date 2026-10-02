@@ -1,0 +1,9 @@
+{
+  "name": "cat-spinner",
+  "version": "1.0.0",
+  "description": "A pixel-art Siamese walks back and forth above the Claude Code spinner, and sits down facing you to think while Claude thinks",
+  "author": {
+    "name": "Scott Wicken",
+    "url": "https://github.com/swicken"
+  }
+}
