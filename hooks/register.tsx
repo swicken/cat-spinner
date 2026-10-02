@@ -87,9 +87,36 @@ export const sceneCells = (cat: Cat, track: number) => {
   return btoa(binary)
 }
 
+const COAT_NAMES = Object.keys(COATS) as Coat[]
+const isCoat = (name: string): name is Coat => (COAT_NAMES as string[]).includes(name)
+
 export const register: Register = (on, options) => {
-  const coat = String(options.coat ?? 'siamese')
-  useCoat(coat in COATS ? (coat as Coat) : 'siamese')
+  const option = String(options.coat ?? 'siamese')
+  const coat: Coat = isCoat(option) ? option : 'siamese'
+  useCoat(coat)
+
+  on('session.start', async ($, e, next) => {
+    await $.command.register({
+      name: 'cat-spinner',
+      description: `Show or switch your cat: /cat-spinner ${COAT_NAMES.join(' | ')}`,
+    })
+
+    return next(e)
+  })
+
+  // Switching writes the plugin's own "Cat" setting, the same one /config
+  // shows, so the module reloads with the new coat.
+  on('command.run', { command: 'cat-spinner' }, async ($, e) => {
+    const choice = e.args.trim().toLowerCase()
+    const choices = COAT_NAMES.map(name => `/cat-spinner ${name}`).join(' or ')
+    if (!choice) return { text: `Your cat is the ${coat}. Switch with ${choices}.` }
+    if (!isCoat(choice)) return { text: `There's no "${choice}" cat. Pick ${choices}.` }
+    if (choice === coat) return { text: `Your cat is already the ${coat}.` }
+    const { deny } = await $.config.set({ key: 'cat-spinner.coat', value: choice })
+
+    return { text: deny ? `Couldn't switch cats: ${deny}` : `Switched to the ${choice}.` }
+  })
+
   let timer: { cancel: () => void } | undefined
   let isThinking = false
   let cat: Cat = { run: 0, think: 0, sit: 0 }

@@ -40,7 +40,14 @@ Then start a new Claude Code session. The cat appears the next time Claude is wo
 
 ## Choosing your cat
 
-Open `/config` in Claude Code, find the **Cat** row for cat-spinner, and pick `siamese` or `orange`. The change takes effect right away.
+Switch cats with a command:
+
+```
+/cat-spinner orange
+/cat-spinner siamese
+```
+
+Run `/cat-spinner` on its own to see which cat you have. The change takes effect right away. The same choice is the **Cat** row for cat-spinner in `/config`, if you prefer the menu.
 
 ## Update and uninstall
 

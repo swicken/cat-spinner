@@ -126,3 +126,35 @@ describe('coats', () => {
     await ui.unmount()
   })
 })
+
+describe('the /cat-spinner command', () => {
+  const RUN = { command: 'cat-spinner', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } } as const
+
+  test('says which cat you have', async $ => {
+    const { text } = await $.command.run({ ...RUN, args: '' })
+    expect(text).toContain('siamese')
+    expect(text).toContain('/cat-spinner orange')
+  })
+
+  test('switches by writing the Cat setting', async ($, on) => {
+    const writes: unknown[] = []
+    on('config.set', (_$, e) => {
+      writes.push({ key: e.key, value: e.value })
+      return { value: e.value }
+    })
+    const { text } = await $.command.run({ ...RUN, args: 'Orange' })
+    expect(writes).toEqual([{ key: 'cat-spinner.coat', value: 'orange' }])
+    expect(text).toBe('Switched to the orange.')
+  })
+
+  test('refuses a cat it does not have, and changes nothing', async ($, on) => {
+    const writes: unknown[] = []
+    on('config.set', (_$, e) => {
+      writes.push(e.key)
+      return { value: e.value }
+    })
+    const { text } = await $.command.run({ ...RUN, args: 'tuxedo' })
+    expect(writes).toEqual([])
+    expect(text).toContain('/cat-spinner siamese or /cat-spinner orange')
+  })
+})
