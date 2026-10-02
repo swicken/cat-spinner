@@ -348,8 +348,8 @@ export const register: Register = (on, options) => {
   const seasonOption = String(options.season ?? 'auto')
   const season: Season = isSeason(seasonOption) ? seasonOption : 'auto'
   isHalloween = isHalloweenOn(season, new Date())
-  const betweenOption = String(options.between ?? 'nap')
-  const between: Between = isBetween(betweenOption) ? betweenOption : 'nap'
+  const betweenOption = String(options.between ?? 'hide')
+  const between: Between = isBetween(betweenOption) ? betweenOption : 'hide'
   useCoat(coat)
   let playing: Playable = animation === 'random' ? pickAnimation(undefined) : animation
 

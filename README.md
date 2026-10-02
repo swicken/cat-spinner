@@ -15,7 +15,7 @@ There are eight cats and four animations, and you can mix them freely.
 | Running a command (Bash) | Crouches and digs, front paws scrabbling, dirt flying back past its hind legs and a little mound growing in front. |
 | Hitting a tool that fails or is denied | Jumps in surprise, back arched, tail puffed straight up, with a `!` over its head. |
 | Using any other tool | Keeps doing its animation. |
-| Done, waiting for you | Curls up asleep in the band above your prompt, right where it stopped, breathing slowly with "z"s drifting up. When you send your next message it wakes with a big stretch and carries on. |
+| Done, waiting for you | Goes away with the spinner and picks up where it left off next time. Or, with napping turned on, curls up asleep above your prompt until your next message wakes it with a big stretch (see [Between turns](#between-turns)). |
 
 A failure interrupts anything, even sitting. Thinking comes before tool reactions. Each reaction lasts at least a second or so, so a quick read still shows.
 
@@ -49,11 +49,11 @@ These set what the cat does while Claude works without a tool running.
 
 ## Between turns
 
-When Claude finishes, the cat doesn't vanish: it curls up for a nap in a small band above your prompt, where it stopped and facing the way it was going, its back rising and falling and "z"s drifting up. Send a message and it wakes with a long play-bow stretch, then gets on with the turn. In the Halloween season it naps in its hat.
+Turn napping on (`/cat-spinner nap`) and, when Claude finishes, the cat doesn't vanish: it curls up for a nap in a small band above your prompt, where it stopped and facing the way it was going, its back rising and falling and "z"s drifting up. Send a message and it wakes with a long play-bow stretch, then gets on with the turn. In the Halloween season it naps in its hat.
 
 ![The orange cat asleep between turns, then waking with a stretch when a message is sent](assets/preview-nap.gif?v=1.10.0)
 
-The nap takes six rows above the prompt. If you'd rather keep that space, set **Between turns** to **Hide** (`/cat-spinner hide`), and the cat simply goes away until the next turn.
+The nap takes six rows above the prompt, so it's off by default: **Between turns** starts as **Hide**, and the cat simply goes away until the next turn. Set it to **Nap** to keep the cat with you.
 
 ## Seasons
 
@@ -101,7 +101,7 @@ There are shortcuts too, if you know what you want:
 /cat-spinner compact     # or full
 /cat-spinner center      # or left, right
 /cat-spinner plain       # or auto, halloween
-/cat-spinner hide        # or nap
+/cat-spinner nap         # or hide
 ```
 
 **Width** sets how much of the terminal the cat walks across. **Full width**, the default, spans the whole window and follows it as you resize. **Compact** caps the track at 90 columns, for shorter walks. A compact track sits at the left by default, and **Alignment** moves it to the center or the right.

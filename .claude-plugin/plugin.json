@@ -71,7 +71,7 @@
       "type": "string",
       "title": "Between turns",
       "description": "What the cat does between turns: nap above the prompt, or hide",
-      "default": "nap",
+      "default": "hide",
       "options": [
         "nap",
         "hide"

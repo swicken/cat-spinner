@@ -688,7 +688,7 @@ describe('napping between turns', () => {
     })
   }
 
-  test('curls up in the band above the prompt between turns', { options: { season: 'plain' } }, async ($, on) => {
+  test('curls up in the band above the prompt between turns', { options: { season: 'plain', between: 'nap' } }, async ($, on) => {
     await quietEngine($, on)
     const ui = await $.ui.mount(BAND)
     const nap = await ui.find({ type: 'Raster', key: 'nap' })
@@ -697,7 +697,7 @@ describe('napping between turns', () => {
     await ui.unmount()
   })
 
-  test('leaves the band alone while Claude works, with Hide, or without room', async ($, on) => {
+  test('leaves the band alone while Claude works, during a survey, or without room', { options: { between: 'nap' } }, async ($, on) => {
     await quietEngine($, on)
     for (const props of [{ ...BAND.props, isWorking: true }, { ...BAND.props, maxRows: 4 }, { ...BAND.props, hasSurvey: true }]) {
       const ui = await $.ui.mount({ ...BAND, props })
@@ -706,7 +706,7 @@ describe('napping between turns', () => {
     }
   })
 
-  test('stays out of sight between turns with Hide', { options: { between: 'hide' } }, async ($, on) => {
+  test('stays out of sight between turns by default (Hide)', async ($, on) => {
     await quietEngine($, on)
     const ui = await $.ui.mount(BAND)
     expect(await ui.find({ type: 'Raster', key: 'nap' })).toBeUndefined()
