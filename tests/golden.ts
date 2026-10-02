@@ -12,7 +12,7 @@ export const GOLDEN: Record<string, string> = {
   'yarn': 'e8d15ae3',
   'pounce': 'c0b03f34',
   'reactions': '0a94a42c',
-  'halloween: walk and sit': 'b41b8c27',
-  'halloween: yarn': '54bd9583',
-  'halloween: reactions': 'e6a8d4b1',
+  'halloween: walk and sit': '2eff09e4',
+  'halloween: yarn': '22cff68e',
+  'halloween: reactions': '5c76854c',
 }

@@ -4,7 +4,7 @@ import { advance, inAnimation, pickAnimation, position, sceneCells, SIT_FRAMES, 
 import { ACT_FRAMES, activityOf, STARTLE_FRAMES } from '../hooks/react'
 import { COATS, CYCLE, pawAt, useCoat, W } from '../hooks/rig'
 import { BALL_R, startPlay } from '../hooks/yarn'
-import { isHalloweenOn, lanternSpots } from '../hooks/season'
+import { isHalloweenOn, LANTERN_ARTS, lanternSpots } from '../hooks/season'
 import { GOLDEN } from './golden'
 import { fingerprint, SCENES } from './scenes'
 
@@ -616,19 +616,20 @@ describe('Halloween', () => {
     // The first lantern's rind, counted in its own columns only: a cat standing
     // over it hides part of it, and a cat well clear of it hides none.
     const track = 130
-    const left = lanternSpots(track)[0]!
+    const width = (LANTERN_ARTS[0]?.[0] ?? '').length
+    const left = lanternSpots(track)[0]! - Math.floor(width / 2)
     const rind = (cat: Cat) => {
       const words = new Uint32Array(Uint8Array.from(atob(sceneCells(cat, track, DECOR)), ch => ch.charCodeAt(0)).buffer)
       let count = 0
       for (let row = 0; row < 9; row++) {
-        for (let col = left; col < left + 7; col++) {
+        for (let col = left; col < left + width; col++) {
           for (const k of [1, 2]) if (words[(row * track + col) * 3 + k] === 0xc96d1d) count++
         }
       }
       return count
     }
-    const over: Cat = { run: Math.max(0, left - 20), think: 0, sit: 0 } // the cat spans left - 20 to left + 19
-    const clear: Cat = { run: left + 10, think: 0, sit: 0 } // the cat starts past the lantern
+    const over: Cat = { run: Math.max(0, left - 15), think: 0, sit: 0 } // the cat spans the lantern
+    const clear: Cat = { run: left + width + 2, think: 0, sit: 0 } // the cat starts past the lantern
     expect(rind(clear)).toBeGreaterThan(0)
     expect(rind(over)).toBeLessThan(rind(clear))
   })

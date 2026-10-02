@@ -122,27 +122,57 @@ export const drawBats = (
   }
 }
 
-const LANTERN: Record<string, number> = { O: 0x4a2208, R: 0xc96d1d, r: 0xa65815, S: 0x4a7a2a }
-const GLOW = [0xffd166, 0xffb347]
-// A carved jack-o'-lantern sitting on the ground: F is the glowing face.
-const LANTERN_ART = [
-  '...S...',
-  '.OrRrO.',
-  'ORFRFRO',
-  'ORrFrRO',
-  'ORFFFRO',
-  '.OrRrO.',
+const LANTERN: Record<string, number> = {
+  O: 0x3a1a06, D: 0x9a4a10, R: 0xc96d1d, L: 0xe88a2c, S: 0x5a7a2a, s: 0x3e5a1c, V: 0x7aa63a,
+}
+// The carved face's glow, bright (Y) and toward the edges of each cut (y), in
+// two shades each that alternate like a candle's flicker.
+const GLOW: Record<string, [number, number]> = { Y: [0xffe08a, 0xffd166], y: [0xffb347, 0xf59a32] }
+
+// Two carved jack-o'-lanterns, a big one and a small one, drawn by hand: ribbed
+// shells shaded darker at the grooves, curved stems with a leaf, and faces
+// with triangle eyes, a nose, and a toothy grin.
+export const LANTERN_ARTS = [
+  [
+    '........sS.....',
+    '.......sS..VV..',
+    '.......S..VV...',
+    '...OOODsDOOO...',
+    '..ODRRDLDRRDO..',
+    '.ODRRRDLDRRRDO.',
+    'ODRRYRDRDRYRRDO',
+    'ODRyYyDRDyYyRDO',
+    'ODRRRDRYRDRRRDO',
+    'ODRyRYyYyYRyRDO',
+    'ODRyYYYYYYYyRDO',
+    '.ODRyYRYRYyRDO.',
+    '..OODRDRDRDOO..',
+    '....OOOOOOO....',
+  ],
+  [
+    '.....sS....',
+    '....sS.V...',
+    '..OODsDOO..',
+    '.ODRDLDRDO.',
+    'ODRYRDRYRDO',
+    'ODyYyDyYyDO',
+    'ODRRDYDRRDO',
+    'ODyYYYYYyDO',
+    '.ODyRYRyDO.',
+    '..OOOOOOO..',
+  ],
 ]
 const LANTERN_SPACING = 45
 
-// Where the jack-o'-lanterns sit along a track: about one per 45 columns,
-// evenly spread.
+// The middle column of each jack-o'-lantern along a track: about one per 45
+// columns, evenly spread, big and small taking turns.
 export const lanternSpots = (track: number) => {
   const count = Math.max(1, Math.floor(track / LANTERN_SPACING))
-  return Array.from({ length: count }, (_, i) => Math.round(((i + 0.5) * track) / count) - 3)
+  return Array.from({ length: count }, (_, i) => Math.round(((i + 0.5) * track) / count))
 }
 
-// Jack-o'-lanterns behind everything, their faces flickering like candles.
+// Jack-o'-lanterns behind everything, standing on the ground, their faces
+// flickering like candles.
 export const drawLanterns = (
   paint: (x: number, y: number, color: number) => void,
   isFree: (x: number, y: number) => boolean,
@@ -150,13 +180,15 @@ export const drawLanterns = (
   time: number,
   ground: number,
 ) => {
-  lanternSpots(track).forEach((left, i) => {
-    const glow = GLOW[Math.floor(time / 3 + i * 2) % 3 === 0 ? 1 : 0]!
-    LANTERN_ART.forEach((line, row) => {
+  lanternSpots(track).forEach((middle, i) => {
+    const art = LANTERN_ARTS[i % LANTERN_ARTS.length]!
+    const left = middle - Math.floor((art[0] ?? '').length / 2)
+    const flicker = Math.floor(time / 3 + i * 2) % 3 === 0 ? 1 : 0
+    art.forEach((line, row) => {
       ;[...line].forEach((ch, col) => {
         const x = left + col
-        const y = ground - LANTERN_ART.length + 1 + row
-        const color = ch === 'F' ? glow : LANTERN[ch]
+        const y = ground - art.length + 1 + row
+        const color = GLOW[ch]?.[flicker] ?? LANTERN[ch]
         if (color !== undefined && isFree(x, y)) paint(x, y, color)
       })
     })
