@@ -78,8 +78,8 @@ const ORANGE: typeof SIAMESE = {
   earInner: 0xf28aa0,
 }
 
-// A tuxedo: black with a white bib, muzzle, and paws, and green eyes. Black
-// coats get a grey outline so they stay visible on a dark terminal.
+// A tuxedo: black with a white bib, muzzle, paws, and nose bridge, and green
+// eyes. Black coats get a grey outline so they stay visible on a dark terminal.
 const TUXEDO: typeof SIAMESE = {
   ...SHARED,
   outline: 0x4a4a56,
@@ -94,7 +94,7 @@ const TUXEDO: typeof SIAMESE = {
   farCoat: 0x17171c,
   farPoint: 0x111115,
   mask: 0x23232b,
-  maskDark: 0x2c2c35,
+  maskDark: 0xf2f2f4, // a white blaze down the nose bridge
   muzzle: 0xf2f2f4,
   paw: 0xf2f2f4,
   farPaw: 0xc4c4cc,

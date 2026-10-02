@@ -1,6 +1,6 @@
 {
   "name": "cat-spinner",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "A pixel-art cat walks back and forth above the spinner, or plays with a ball of yarn, and sits down facing you to think while Claude thinks",
   "author": {
     "name": "Scott Wicken",
