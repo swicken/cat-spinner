@@ -64,7 +64,7 @@ Patched coats (calico, tortoiseshell) set `patchScale`, `patchLow`, `patchHigh`,
 
 1. Bump `version` in `.claude-plugin/plugin.json`.
 2. Run `npx tsx scripts/preview.ts`, then check `git status` to see which assets changed and confirm only the expected ones did.
-3. If `assets/coats.png` changed, bump the `?v=` on its link in `README.md`. GitHub's raw cache and browsers otherwise keep showing the old image.
+3. For every image in `assets/` that changed, bump the `?v=` on its link in `README.md` to the new version. GitHub's raw cache and browsers otherwise keep showing the old image.
 4. Validate and test, commit, then push only when the user asks.
 5. Verify the published version by installing it as a coworker would, then remove it so it doesn't run alongside a local dev copy:
 

@@ -19,17 +19,17 @@ There are eight cats and four animations, and you can mix them freely.
 
 A failure interrupts anything, even sitting. Thinking comes before tool reactions. Each reaction lasts at least a second or so, so a quick read still shows.
 
-![Each reaction, labeled with what Claude is doing: working, thinking, editing a file, reading a file, running a command, and a tool failing](assets/preview-reactions.gif)
+![Each reaction, labeled with what Claude is doing: working, thinking, editing a file, reading a file, running a command, and a tool failing](assets/preview-reactions.gif?v=1.8.1)
 
 ## Cats
 
-![All eight cats, each named, walking and sitting](assets/coats.png?v=1.6.0)
+![All eight cats, each named, walking and sitting](assets/coats.png?v=1.8.1)
 
 **Siamese** is the default. **White** has odd eyes, one blue and one amber, which you see when it sits facing you. **Calico** and **Tortoiseshell** have patched coats: the patches are fixed to the cat's body, so they move with it as it walks.
 
 Here's the Siamese walking, sitting down while Claude thinks, and walking on:
 
-![The Siamese walking, sitting down to think, and walking on](assets/preview-siamese.gif)
+![The Siamese walking, sitting down to think, and walking on](assets/preview-siamese.gif?v=1.8.1)
 
 ## Animations
 
@@ -39,11 +39,11 @@ These set what the cat does while Claude works without a tool running.
 
 **Yarn:** the cat plays with a ball of yarn. It walks up to the ball, drops into a play-bow, and swats it with a front paw. The ball rolls away spinning, trailing a loose strand, and the cat chases it. Now and then it scoops the ball back under itself and has to turn around to follow it. When Claude thinks, the cat sits down facing you and the ball stays where it stopped.
 
-![The orange tabby playing with a ball of yarn](assets/preview-yarn.gif)
+![The orange tabby playing with a ball of yarn](assets/preview-yarn.gif?v=1.8.1)
 
 **Pounce:** the yarn game, but unpredictable. Each swat hits with a random strength and sometimes scoops the ball backward. Now and then the cat stops low to watch the ball roll, or stalks a ball that has nearly stopped: it crouches, wiggles its rear, and leaps onto it.
 
-![The Siamese stalking and pouncing on a ball of yarn](assets/preview-pounce.gif)
+![The Siamese stalking and pouncing on a ball of yarn](assets/preview-pounce.gif?v=1.8.1)
 
 **Random:** a different one of walk, yarn, and pounce each time Claude starts working. The cat carries on from wherever it is.
 
