@@ -124,10 +124,10 @@ export const blend = (a: Pose, b: Pose, t: number): Pose => {
 export const CYCLE = 12
 const PLANTED = 8
 const STRIDE = PLANTED - 1
-const GROUND = 15.9
+export const GROUND = 15.9
 const STEP_HEIGHT = 2.4
 
-const smooth = (t: number) => t * t * (3 - 2 * t)
+export const smooth = (t: number) => t * t * (3 - 2 * t)
 
 export const pawAt = (frame: number, offset: number, homeX: number): Paw => {
   const f = (((frame - offset) % CYCLE) + CYCLE) % CYCLE

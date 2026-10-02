@@ -2,6 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import { advance, position, sceneCells, SIT_FRAMES, type Cat } from '../hooks/register'
 import { CYCLE, pawAt, W } from '../hooks/rig'
+import { BALL_R, startPlay } from '../hooks/yarn'
 
 const TRACK = W + 10 // a 10-cell span to walk across
 const WALKING: Cat = { run: 0, think: 0, sit: 0 }
@@ -156,5 +157,83 @@ describe('the /cat-spinner command', () => {
     const { text } = await $.command.run({ ...RUN, args: 'tuxedo' })
     expect(writes).toEqual([])
     expect(text).toContain('/cat-spinner siamese or /cat-spinner orange')
+    expect(text).toContain('/cat-spinner walk or /cat-spinner yarn')
+  })
+})
+
+describe('the yarn animation', () => {
+  const YARN_TRACK = 90
+  const session = (frames: number) => {
+    let cat: Cat = { run: 0, think: 0, sit: 0, play: startPlay(YARN_TRACK) }
+    const all = [cat]
+    for (let i = 0; i < frames; i++) all.push((cat = advance(cat, false, YARN_TRACK)))
+    return all
+  }
+
+  test('swats the ball, chases it, and turns around to follow it', () => {
+    const all = session(600)
+    const swats = all.filter((cat, i) => i > 0 && cat.play!.swat === 1 && all[i - 1]!.play!.swat === 0).length
+    const turns = all.filter((cat, i) => i > 0 && cat.play!.isFacingRight !== all[i - 1]!.play!.isFacingRight).length
+    expect(swats).toBeGreaterThanOrEqual(5)
+    expect(turns).toBeGreaterThanOrEqual(1)
+  })
+
+  test('keeps the cat and the ball on the track', () => {
+    for (const { play } of session(600)) {
+      expect(play!.x).toBeGreaterThanOrEqual(0)
+      expect(play!.x).toBeLessThanOrEqual(YARN_TRACK - W)
+      expect(play!.ballX - BALL_R).toBeGreaterThanOrEqual(0)
+      expect(play!.ballX + BALL_R).toBeLessThanOrEqual(YARN_TRACK)
+    }
+  })
+
+  // Walking forward or backing up, the gait advances one frame per pixel the
+  // same way, so planted paws stay put on the ground.
+  test('moves the gait in step with the cat', () => {
+    const all = session(600)
+    all.slice(1).forEach((cat, i) => {
+      const before = all[i]!
+      if (cat.play!.isFacingRight !== before.play!.isFacingRight) return
+      const moved = (cat.play!.x - before.play!.x) * (cat.play!.isFacingRight ? 1 : -1)
+      expect(cat.run - before.run).toBe(moved + 0) // + 0 turns -0 into 0
+    })
+  })
+
+  test('draws the ball from the first frame', { options: { animation: 'yarn' } }, async ($, on) => {
+    await engineSpinner($, on)
+    const ui = await $.ui.mount(SPINNER)
+    const colors = colorsOf((await ui.find({ type: 'Raster', key: 'cat' }))?.props.cells)
+    expect(colors.has(0xd94a5a)).toBe(true) // the yarn
+    await ui.unmount()
+  })
+
+  test('has no ball in the walk animation', async ($, on) => {
+    await engineSpinner($, on)
+    const ui = await $.ui.mount(SPINNER)
+    const colors = colorsOf((await ui.find({ type: 'Raster', key: 'cat' }))?.props.cells)
+    expect(colors.has(0xd94a5a)).toBe(false)
+    await ui.unmount()
+  })
+})
+
+describe('switching animations with /cat-spinner', () => {
+  const RUN = { command: 'cat-spinner', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } } as const
+
+  test('writes the Animation setting', async ($, on) => {
+    const writes: unknown[] = []
+    on('config.set', (_$, e) => {
+      writes.push({ key: e.key, value: e.value })
+      return { value: e.value }
+    })
+    const { text } = await $.command.run({ ...RUN, args: 'yarn' })
+    expect(writes).toEqual([{ key: 'cat-spinner.animation', value: 'yarn' }])
+    expect(text).toBe('Switched to the yarn animation.')
+  })
+
+  test('reports both the cat and the animation', async $ => {
+    const { text } = await $.command.run({ ...RUN, args: '' })
+    expect(text).toContain('siamese')
+    expect(text).toContain('walk')
+    expect(text).toContain('/cat-spinner yarn')
   })
 })

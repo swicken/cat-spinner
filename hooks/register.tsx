@@ -1,6 +1,7 @@
 import type { Register } from 'claude-code'
 
-import { blend, COATS, drawCat, drawSitCat, H, standPose, useCoat, walkPose, W, type Coat, type Text, type Thought } from './rig'
+import { blend, COATS, COLORS, drawCat, drawSitCat, H, standPose, useCoat, walkPose, W, type Coat, type Text, type Thought } from './rig'
+import { drawBall, rollBall, startPlay, stepPlay, swatPose, type Play } from './yarn'
 
 const FRAME_MS = 90
 const KEY = 'cat'
@@ -15,6 +16,9 @@ const THOUGHTS = ['hmm', '...', ' ? ', 'hmm', ' ! ']
 
 const smooth = (t: number) => t * t * (3 - 2 * t)
 
+export const ANIMATIONS = ['walk', 'yarn'] as const
+export type Animation = (typeof ANIMATIONS)[number]
+
 // Where the cat stands on a track, and which way it faces, after `run` steps.
 export const position = (run: number, track: number) => {
   const span = Math.max(1, track - W)
@@ -25,14 +29,23 @@ export const position = (run: number, track: number) => {
 }
 
 // `sit` counts frames of sitting down, 0 (walking) to SIT_FRAMES (seated).
-export type Cat = { run: number; think: number; sit: number }
+// `play` is there in the yarn animation: where the cat and the ball are.
+export type Cat = { run: number; think: number; sit: number; play?: Play }
 
-// What the cat does next frame: walk, or sit down and think while Claude thinks.
-export const advance = (cat: Cat, isThinking: boolean): Cat => {
-  if (isThinking) {
-    return cat.sit < SIT_FRAMES ? { ...cat, sit: cat.sit + 1 } : { ...cat, think: cat.think + 1 }
+// What the cat does next frame: walk or play, or sit down and think while
+// Claude thinks. A rolling ball keeps rolling while the cat sits.
+export const advance = (cat: Cat, isThinking: boolean, track = W): Cat => {
+  if (isThinking || cat.sit > 0) {
+    const play = cat.play && { ...rollBall(cat.play, track), swat: 0 }
+    if (isThinking) {
+      return cat.sit < SIT_FRAMES ? { ...cat, play, sit: cat.sit + 1 } : { ...cat, play, think: cat.think + 1 }
+    }
+    return { ...cat, play, sit: cat.sit - 1, think: 0 }
   }
-  if (cat.sit > 0) return { ...cat, sit: cat.sit - 1, think: 0 }
+  if (cat.play) {
+    const { play, run } = stepPlay(cat.play, cat.run, track)
+    return { ...cat, play, run }
+  }
 
   return { ...cat, run: cat.run + 1 }
 }
@@ -47,28 +60,49 @@ const thoughtOf = ({ sit, think }: Cat): Thought => {
 // The whole track as Raster cells: [codePoint, foreground, background] per cell,
 // two pixels stacked in each cell as a half block.
 export const sceneCells = (cat: Cat, track: number) => {
-  const { x, isFacingRight } = position(cat.run, track)
+  const { x, isFacingRight } = cat.play ?? position(cat.run, track)
   const isBlinking = cat.run % 50 >= 48
+  const moving = walkPose(cat.run, isBlinking)
+  const pose = cat.play && cat.play.swat > 0 ? swatPose(cat.play.swat, moving) : moving
   const { canvas, texts } =
     cat.sit <= SETTLE_FRAMES
-      ? drawCat(
-          blend(walkPose(cat.run, isBlinking), standPose(), smooth(cat.sit / SETTLE_FRAMES)),
-          cat.sit === SETTLE_FRAMES,
-        )
+      ? drawCat(blend(pose, standPose(), smooth(cat.sit / SETTLE_FRAMES)), cat.sit === SETTLE_FRAMES)
       : drawSitCat(cat.think, thoughtOf(cat))
-  const pixel = (px: number, py: number) => {
-    const i = py * W + (isFacingRight ? px : W - 1 - px)
-    return (canvas.owner[i] ?? -1) === -1 ? undefined : canvas.color[i]
+
+  // The track's pixels: the cat at x, then the ball wherever the cat is not
+  // (its shadow aside), so a swatting paw stays in front of the ball.
+  const pixels = new Int32Array(track * H)
+  const filled = new Uint8Array(track * H)
+  for (let py = 0; py < H; py++) {
+    for (let px = 0; px < W; px++) {
+      const i = py * W + (isFacingRight ? px : W - 1 - px)
+      if ((canvas.owner[i] ?? -1) === -1 || x + px >= track) continue
+      pixels[py * track + x + px] = canvas.color[i] ?? 0
+      filled[py * track + x + px] = 1
+    }
   }
+  if (cat.play) {
+    const inside = (px: number, py: number) => px >= 0 && px < track && py >= 0 && py < H
+    drawBall(
+      (px, py, color) => {
+        if (!inside(px, py)) return
+        pixels[py * track + px] = color
+        filled[py * track + px] = 1
+      },
+      (px, py) => inside(px, py) && (!filled[py * track + px] || pixels[py * track + px] === COLORS.shadow),
+      cat.play,
+    )
+  }
+
   const words = new Uint32Array(track * ROWS * 3)
   for (let i = 0; i < words.length; i += 3) words.set([0x20, DEFAULT_COLOR, DEFAULT_COLOR], i)
-
+  const pixel = (px: number, py: number) => (filled[py * track + px] ? pixels[py * track + px] : undefined)
   for (let row = 0; row < ROWS; row++) {
-    for (let col = 0; col < W; col++) {
+    for (let col = 0; col < track; col++) {
       const top = pixel(col, row * 2)
       const bottom = pixel(col, row * 2 + 1)
       if (top === undefined && bottom === undefined) continue
-      const at = (row * track + x + col) * 3
+      const at = (row * track + col) * 3
       if (top === undefined) words.set([LOWER_HALF, bottom ?? DEFAULT_COLOR, DEFAULT_COLOR], at)
       else words.set([UPPER_HALF, top, bottom ?? DEFAULT_COLOR], at)
     }
@@ -89,32 +123,43 @@ export const sceneCells = (cat: Cat, track: number) => {
 
 const COAT_NAMES = Object.keys(COATS) as Coat[]
 const isCoat = (name: string): name is Coat => (COAT_NAMES as string[]).includes(name)
+const isAnimation = (name: string): name is Animation => (ANIMATIONS as readonly string[]).includes(name)
 
 export const register: Register = (on, options) => {
-  const option = String(options.coat ?? 'siamese')
-  const coat: Coat = isCoat(option) ? option : 'siamese'
+  const coatOption = String(options.coat ?? 'siamese')
+  const coat: Coat = isCoat(coatOption) ? coatOption : 'siamese'
+  const animationOption = String(options.animation ?? 'walk')
+  const animation: Animation = isAnimation(animationOption) ? animationOption : 'walk'
   useCoat(coat)
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'cat-spinner',
-      description: `Show or switch your cat: /cat-spinner ${COAT_NAMES.join(' | ')}`,
+      description: `Show or switch your cat or its animation: /cat-spinner ${[...COAT_NAMES, ...ANIMATIONS].join(' | ')}`,
     })
 
     return next(e)
   })
 
-  // Switching writes the plugin's own "Cat" setting, the same one /config
-  // shows, so the module reloads with the new coat.
+  // Switching writes the plugin's own "Cat" or "Animation" setting, the same
+  // ones /config shows, so the module reloads with the new choice.
   on('command.run', { command: 'cat-spinner' }, async ($, e) => {
     const choice = e.args.trim().toLowerCase()
-    const choices = COAT_NAMES.map(name => `/cat-spinner ${name}`).join(' or ')
-    if (!choice) return { text: `Your cat is the ${coat}. Switch with ${choices}.` }
-    if (!isCoat(choice)) return { text: `There's no "${choice}" cat. Pick ${choices}.` }
-    if (choice === coat) return { text: `Your cat is already the ${coat}.` }
-    const { deny } = await $.config.set({ key: 'cat-spinner.coat', value: choice })
+    const list = (names: readonly string[]) => names.map(name => `/cat-spinner ${name}`).join(' or ')
+    const usage = `Switch cats with ${list(COAT_NAMES)}, and animations with ${list(ANIMATIONS)}.`
+    if (!choice) return { text: `Your cat is the ${coat}, and the animation is ${animation}. ${usage}` }
+    if (isCoat(choice)) {
+      if (choice === coat) return { text: `Your cat is already the ${coat}.` }
+      const { deny } = await $.config.set({ key: 'cat-spinner.coat', value: choice })
+      return { text: deny ? `Couldn't switch cats: ${deny}` : `Switched to the ${choice}.` }
+    }
+    if (isAnimation(choice)) {
+      if (choice === animation) return { text: `The animation is already ${animation}.` }
+      const { deny } = await $.config.set({ key: 'cat-spinner.animation', value: choice })
+      return { text: deny ? `Couldn't switch animations: ${deny}` : `Switched to the ${choice} animation.` }
+    }
 
-    return { text: deny ? `Couldn't switch cats: ${deny}` : `Switched to the ${choice}.` }
+    return { text: `There's no "${choice}". ${usage}` }
   })
 
   let timer: { cancel: () => void } | undefined
@@ -125,8 +170,9 @@ export const register: Register = (on, options) => {
 
   on('prompt.submit', ($, e, next) => {
     timer ??= $.clock.every(FRAME_MS, () => {
-      cat = advance(cat, isThinking)
       if (!requestId || !track) return
+      if (animation === 'yarn' && !cat.play) cat = { ...cat, play: startPlay(track) }
+      cat = advance(cat, isThinking, track)
       void $.ui.blit({ requestId, key: KEY, columns: track, rows: ROWS, cells: sceneCells(cat, track) })
     })
 
@@ -146,6 +192,7 @@ export const register: Register = (on, options) => {
     isThinking = e.props.mode === 'thinking'
     requestId = e.requestId
     track = Math.min(90, Math.max(W + 4, (e.viewport?.columns ?? 80) - 6))
+    if (animation === 'yarn' && !cat.play) cat = { ...cat, play: startPlay(track) }
     const { Box, Raster } = $.ui.resolve(e)
 
     return (

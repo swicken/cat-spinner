@@ -1,5 +1,6 @@
-// Renders the README animations, assets/preview-<coat>.gif for each coat, from
-// the mod's real cell output: a walk, a sit to think, and a stand. Needs ffmpeg
+// Renders the README animations from the mod's real cell output: the walk in
+// each coat (assets/preview-<coat>.gif) and the yarn animation
+// (assets/preview-yarn.gif), each with a sit to think and a stand. Needs ffmpeg
 // on the PATH.
 //   npx tsx scripts/preview.ts
 import { execFileSync } from 'node:child_process'
@@ -10,6 +11,7 @@ import { crc32, deflateSync } from 'node:zlib'
 
 import { advance, sceneCells, type Cat } from '../hooks/register.tsx'
 import { COATS, H, useCoat, type Coat } from '../hooks/rig.ts'
+import { startPlay } from '../hooks/yarn.ts'
 
 const TRACK = 70
 const ROWS = H / 2
@@ -67,15 +69,7 @@ const scanlines = (img: Uint8Array, w: number, h: number) => {
   return deflateSync(raw)
 }
 
-// The scene: walk, sit to think, then get up and walk on.
-const script = [...Array(70).fill(false), ...Array(55).fill(true), ...Array(30).fill(false)] as boolean[]
-
-mkdirSync('assets', { recursive: true })
-for (const coat of Object.keys(COATS) as Coat[]) {
-  useCoat(coat)
-  let cat: Cat = { run: 0, think: 0, sit: 0 }
-  const frames = script.map(isThinking => toImage(sceneCells((cat = advance(cat, isThinking)), TRACK)))
-
+const gif = (name: string, frames: Uint8Array[]) => {
   const control = Buffer.alloc(8)
   control.writeUInt32BE(frames.length, 0)
   const parts = [...header(width, height), chunk('acTL', control)]
@@ -105,7 +99,22 @@ for (const coat of Object.keys(COATS) as Coat[]) {
   execFileSync('ffmpeg', [
     '-loglevel', 'error', '-y', '-i', apng,
     '-vf', 'split[a][b];[a]palettegen=stats_mode=full[p];[b][p]paletteuse=dither=none',
-    '-loop', '0', `assets/preview-${coat}.gif`,
+    '-loop', '0', `assets/${name}.gif`,
   ])
-  console.log(`wrote assets/preview-${coat}.gif (${frames.length} frames)`)
+  console.log(`wrote assets/${name}.gif (${frames.length} frames)`)
 }
+
+// One scene: Claude working, then thinking, then working again.
+const scene = (start: Cat, working: number, thinking: number, after: number) => {
+  const script = [...Array(working).fill(false), ...Array(thinking).fill(true), ...Array(after).fill(false)] as boolean[]
+  let cat = start
+  return script.map(isThinking => toImage(sceneCells((cat = advance(cat, isThinking, TRACK)), TRACK)))
+}
+
+mkdirSync('assets', { recursive: true })
+for (const coat of Object.keys(COATS) as Coat[]) {
+  useCoat(coat)
+  gif(`preview-${coat}`, scene({ run: 0, think: 0, sit: 0 }, 70, 55, 30))
+}
+useCoat('orange')
+gif('preview-yarn', scene({ run: 0, think: 0, sit: 0, play: startPlay(TRACK) }, 170, 50, 20))
